@@ -17,51 +17,51 @@ var _ Operation = (*OpDropConstraint)(nil)
 func (o *OpDropConstraint) Start(ctx context.Context, conn db.DB, latestSchema string, tr SQLTransformer, s *schema.Schema, cbs ...CallbackFn) (*schema.Table, error) {
 	table := s.GetTable(o.Table)
 
-	// By this point Validate() should have run which ensures the constraint exists and that we only have
-	// one column associated with it.
-	column := table.GetColumn(table.GetConstraintColumns(o.Name)[0])
+	for _, c := range table.GetConstraintColumns(o.Name) {
+		column := table.GetColumn(c)
 
-	// Create a copy of the column on the underlying table.
-	d := NewColumnDuplicator(conn, table, column).WithoutConstraint(o.Name)
-	if err := d.Duplicate(ctx); err != nil {
-		return nil, fmt.Errorf("failed to duplicate column: %w", err)
-	}
+		// Create a copy of the column on the underlying table.
+		d := NewColumnDuplicator(conn, table, column).WithoutConstraint(o.Name)
+		if err := d.Duplicate(ctx); err != nil {
+			return nil, fmt.Errorf("failed to duplicate column: %w", err)
+		}
 
-	// Add a trigger to copy values from the old column to the new, rewriting values using the `up` SQL.
-	err := createTrigger(ctx, conn, tr, triggerConfig{
-		Name:           TriggerName(o.Table, column.Name),
-		Direction:      TriggerDirectionUp,
-		Columns:        table.Columns,
-		SchemaName:     s.Name,
-		LatestSchema:   latestSchema,
-		TableName:      o.Table,
-		PhysicalColumn: TemporaryName(column.Name),
-		SQL:            o.upSQL(column.Name),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create up trigger: %w", err)
-	}
+		// Add a trigger to copy values from the old column to the new, rewriting values using the `up` SQL.
+		err := createTrigger(ctx, conn, tr, triggerConfig{
+			Name:           TriggerName(o.Table, column.Name),
+			Direction:      TriggerDirectionUp,
+			Columns:        table.Columns,
+			SchemaName:     s.Name,
+			LatestSchema:   latestSchema,
+			TableName:      o.Table,
+			PhysicalColumn: TemporaryName(column.Name),
+			SQL:            o.upSQL(column.Name),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create up trigger: %w", err)
+		}
 
-	// Add the new column to the internal schema representation. This is done
-	// here, before creation of the down trigger, so that the trigger can declare
-	// a variable for the new column.
-	table.AddColumn(column.Name, schema.Column{
-		Name: TemporaryName(column.Name),
-	})
+		// Add the new column to the internal schema representation. This is done
+		// here, before creation of the down trigger, so that the trigger can declare
+		// a variable for the new column.
+		table.AddColumn(column.Name, schema.Column{
+			Name: TemporaryName(column.Name),
+		})
 
-	// Add a trigger to copy values from the new column to the old, rewriting values using the `down` SQL.
-	err = createTrigger(ctx, conn, tr, triggerConfig{
-		Name:           TriggerName(o.Table, TemporaryName(column.Name)),
-		Direction:      TriggerDirectionDown,
-		Columns:        table.Columns,
-		SchemaName:     s.Name,
-		LatestSchema:   latestSchema,
-		TableName:      o.Table,
-		PhysicalColumn: column.Name,
-		SQL:            o.Down,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create down trigger: %w", err)
+		// Add a trigger to copy values from the new column to the old, rewriting values using the `down` SQL.
+		err = createTrigger(ctx, conn, tr, triggerConfig{
+			Name:           TriggerName(o.Table, TemporaryName(column.Name)),
+			Direction:      TriggerDirectionDown,
+			Columns:        table.Columns,
+			SchemaName:     s.Name,
+			LatestSchema:   latestSchema,
+			TableName:      o.Table,
+			PhysicalColumn: column.Name,
+			SQL:            o.Down,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create down trigger: %w", err)
+		}
 	}
 	return table, nil
 }
@@ -69,33 +69,36 @@ func (o *OpDropConstraint) Start(ctx context.Context, conn db.DB, latestSchema s
 func (o *OpDropConstraint) Complete(ctx context.Context, conn db.DB, tr SQLTransformer, s *schema.Schema) error {
 	// We have already validated that there is single column related to this constraint.
 	table := s.GetTable(o.Table)
-	column := table.GetColumn(table.GetConstraintColumns(o.Name)[0])
 
-	// Remove the up function and trigger
-	_, err := conn.ExecContext(ctx, fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
-		pq.QuoteIdentifier(TriggerFunctionName(o.Table, column.Name))))
-	if err != nil {
-		return err
-	}
+	for _, c := range table.GetConstraintColumns(o.Name) {
+		column := table.GetColumn(c)
 
-	// Remove the down function and trigger
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
-		pq.QuoteIdentifier(TriggerFunctionName(o.Table, TemporaryName(column.Name)))))
-	if err != nil {
-		return err
-	}
+		// Remove the up function and trigger
+		_, err := conn.ExecContext(ctx, fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
+			pq.QuoteIdentifier(TriggerFunctionName(o.Table, column.Name))))
+		if err != nil {
+			return err
+		}
 
-	// Drop the old column
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %s",
-		pq.QuoteIdentifier(o.Table),
-		pq.QuoteIdentifier(column.Name)))
-	if err != nil {
-		return err
-	}
+		// Remove the down function and trigger
+		_, err = conn.ExecContext(ctx, fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
+			pq.QuoteIdentifier(TriggerFunctionName(o.Table, TemporaryName(column.Name)))))
+		if err != nil {
+			return err
+		}
 
-	// Rename the new column to the old column name
-	if err := RenameDuplicatedColumn(ctx, conn, table, column); err != nil {
-		return err
+		// Drop the old column
+		_, err = conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %s",
+			pq.QuoteIdentifier(o.Table),
+			pq.QuoteIdentifier(column.Name)))
+		if err != nil {
+			return err
+		}
+
+		// Rename the new column to the old column name
+		if err := RenameDuplicatedColumn(ctx, conn, table, column); err != nil {
+			return err
+		}
 	}
 
 	return err
@@ -146,15 +149,6 @@ func (o *OpDropConstraint) Validate(ctx context.Context, s *schema.Schema) error
 	}
 
 	columns := table.GetConstraintColumns(o.Name)
-
-	// We already know the constraint exists because we checked it earlier so we only need to check the
-	// case where there are multiple columns.
-	if len(columns) > 1 {
-		return MultiColumnConstraintsNotSupportedError{
-			Table:      table.Name,
-			Constraint: o.Name,
-		}
-	}
 
 	if o.Down == "" {
 		return FieldRequiredError{Name: "down"}
