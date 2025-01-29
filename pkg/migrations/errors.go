@@ -271,6 +271,14 @@ func (e PrimaryKeysAreAlreadySetError) Error() string {
 	return fmt.Sprintf("table %q already has a primary key configuration in columns list", e.Table)
 }
 
+type PrimaryKeyAlreadyExistsError struct {
+	Table string
+}
+
+func (e PrimaryKeyAlreadyExistsError) Error() string {
+	return fmt.Sprintf("table %q already has a primary key", e.Table)
+}
+
 type InvalidGeneratedColumnError struct {
 	Table  string
 	Column string

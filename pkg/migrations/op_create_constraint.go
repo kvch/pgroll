@@ -68,15 +68,13 @@ func (o *OpCreateConstraint) Start(ctx context.Context, conn db.DB, latestSchema
 
 	switch o.Type {
 	case OpCreateConstraintTypeUnique:
-		temporaryColumnNames := make([]string, len(o.Columns))
-		for i, col := range o.Columns {
-			temporaryColumnNames[i] = TemporaryName(col)
-		}
-		return table, createUniqueIndexConcurrently(ctx, conn, s.Name, o.Name, o.Table, temporaryColumnNames)
+		return table, createUniqueIndexConcurrently(ctx, conn, s.Name, o.Name, o.Table, temporaryNames(o.Columns))
 	case OpCreateConstraintTypeCheck:
 		return table, o.addCheckConstraint(ctx, conn)
 	case OpCreateConstraintTypeForeignKey:
 		return table, o.addForeignKeyConstraint(ctx, conn)
+	case OpCreateConstraintTypePrimaryKey:
+		return table, o.addPrimaryKeyConstraint(ctx, conn)
 	}
 
 	return table, nil
@@ -232,6 +230,14 @@ func (o *OpCreateConstraint) Validate(ctx context.Context, s *schema.Schema) err
 				}
 			}
 		}
+	case OpCreateConstraintTypePrimaryKey:
+		if len(o.Columns) == 0 {
+			return FieldRequiredError{Name: "columns"}
+		}
+		table := s.GetTable(o.Table)
+		if len(table.PrimaryKey) > 0 {
+			return PrimaryKeyAlreadyExistsError{Table: o.Table}
+		}
 	}
 
 	return nil
@@ -266,10 +272,28 @@ func (o *OpCreateConstraint) addForeignKeyConstraint(ctx context.Context, conn d
 	return err
 }
 
+func (o *OpCreateConstraint) addPrimaryKeyConstraint(ctx context.Context, conn db.DB) error {
+	sql := fmt.Sprintf("ALTER TABLE %s ADD ", pq.QuoteIdentifier(o.Table))
+	writer := &ConstraintSQLWriter{Name: o.Name, Columns: temporaryNames(o.Columns)}
+	sql += writer.WritePrimaryKey()
+	sql += " NOT VALID"
+
+	_, err := conn.ExecContext(ctx, sql)
+	return err
+}
+
 func quotedTemporaryNames(columns []string) []string {
 	names := make([]string, len(columns))
 	for i, col := range columns {
 		names[i] = pq.QuoteIdentifier(TemporaryName(col))
+	}
+	return names
+}
+
+func temporaryNames(columns []string) []string {
+	names := make([]string, len(columns))
+	for i, col := range columns {
+		names[i] = TemporaryName(col)
 	}
 	return names
 }

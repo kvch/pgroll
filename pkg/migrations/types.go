@@ -84,7 +84,7 @@ type Constraint struct {
 	// Exclude constraint definition
 	Exclude *ConstraintExclude `json:"exclude,omitempty"`
 
-	// IndexParameters corresponds to the JSON schema field "index_parameters".
+	// Index parameters for the constraint
 	IndexParameters *ConstraintIndexParameters `json:"index_parameters,omitempty"`
 
 	// Initially deferred constraint
@@ -254,6 +254,9 @@ type OpCreateConstraint struct {
 	// SQL expressions for down migrations
 	Down MultiColumnDownSQL `json:"down"`
 
+	// Index parameters for the constraint
+	IndexParameters *ConstraintIndexParameters `json:"index_parameters,omitempty"`
+
 	// Name of the constraint
 	Name string `json:"name"`
 
@@ -286,6 +289,7 @@ type OpCreateConstraintType string
 
 const OpCreateConstraintTypeCheck OpCreateConstraintType = "check"
 const OpCreateConstraintTypeForeignKey OpCreateConstraintType = "foreign_key"
+const OpCreateConstraintTypePrimaryKey OpCreateConstraintType = "primary_key"
 const OpCreateConstraintTypeUnique OpCreateConstraintType = "unique"
 
 // Create index operation

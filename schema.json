@@ -97,6 +97,26 @@
       "required": ["name", "type"],
       "type": "object"
     },
+    "ConstraintIndexParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tablespace": {
+          "type": "string",
+          "default": ""
+        },
+        "storage_parameters": {
+          "type": "string",
+          "default": ""
+        },
+        "include_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "ForeignKeyReference": {
       "additionalProperties": false,
       "description": "Foreign key reference definition",
@@ -237,24 +257,8 @@
           }
         },
         "index_parameters": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "tablespace": {
-              "type": "string",
-              "default": ""
-            },
-            "storage_parameters": {
-              "type": "string",
-              "default": ""
-            },
-            "include_columns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
+          "description": "Index parameters for the constraint",
+          "$ref": "#/$defs/ConstraintIndexParameters"
         }
       },
       "allOf": [
@@ -760,7 +764,7 @@
         "type": {
           "description": "Type of the constraint",
           "type": "string",
-          "enum": ["unique", "check", "foreign_key"]
+          "enum": ["unique", "check", "foreign_key", "primary_key"]
         },
         "check": {
           "description": "Check constraint expression",
@@ -790,6 +794,10 @@
             }
           }
         },
+        "index_parameters": {
+          "description": "Index parameters for the constraint",
+          "$ref": "#/$defs/ConstraintIndexParameters"
+        },
         "up": {
           "description": "SQL expressions for up migrations",
           "$ref": "#/$defs/MultiColumnUpSQL"
@@ -800,7 +808,63 @@
         }
       },
       "required": ["name", "table", "type", "up", "down"],
-      "type": "object"
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "unique"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "check": {
+                "const": ""
+              }
+            },
+            "required": ["columns"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "check"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "check": {
+                "type": "string"
+              },
+              "index_parameters": {
+                "const": {}
+              }
+            },
+            "required": ["check"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "primary_key"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "check": {
+                "const": ""
+              }
+            },
+            "required": ["columns"]
+          }
+        }
+      ]
     },
     "OpDropMultiColumnConstraint": {
       "additionalProperties": false,
