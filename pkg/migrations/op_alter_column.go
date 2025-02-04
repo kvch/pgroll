@@ -108,6 +108,14 @@ func (o *OpAlterColumn) Complete(ctx context.Context, conn db.DB, tr SQLTransfor
 		return err
 	}
 
+	// Remove the needs backfill column
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %s",
+		pq.QuoteIdentifier(o.Table),
+		pq.QuoteIdentifier(CNeedsBackfillColumn)))
+	if err != nil {
+		return err
+	}
+
 	// Rename the new column to the old column name
 	table := s.GetTable(o.Table)
 	column := table.GetColumn(o.Column)
@@ -155,7 +163,12 @@ func (o *OpAlterColumn) Rollback(ctx context.Context, conn db.DB, tr SQLTransfor
 		return err
 	}
 
-	return nil
+	// Remove the needs backfill column
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP COLUMN IF EXISTS %s",
+		pq.QuoteIdentifier(table.Name),
+		pq.QuoteIdentifier(CNeedsBackfillColumn)))
+
+	return err
 }
 
 func (o *OpAlterColumn) Validate(ctx context.Context, s *schema.Schema) error {
