@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"text/template"
 
 	"github.com/lib/pq"
@@ -21,6 +22,8 @@ const (
 	TriggerDirectionUp   TriggerDirection = "up"
 	TriggerDirectionDown TriggerDirection = "down"
 )
+
+const CNeedsBackfillColumn = "_pgroll_needs_backfill"
 
 type triggerConfig struct {
 	Name           string
@@ -56,6 +59,14 @@ func createTrigger(ctx context.Context, conn db.DB, tr SQLTransformer, cfg trigg
 	}
 
 	return conn.WithRetryableTransaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
+		_, err := conn.ExecContext(ctx,
+			fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s boolean DEFAULT true",
+				pq.QuoteIdentifier(cfg.TableName),
+				pq.QuoteIdentifier(CNeedsBackfillColumn)))
+		if err != nil {
+			return err
+		}
+
 		_, err = conn.ExecContext(ctx, funcSQL)
 		if err != nil {
 			return err
