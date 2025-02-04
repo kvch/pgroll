@@ -834,6 +834,11 @@ func MustSelect(t *testing.T, db *sql.DB, schema, version, table string) []map[s
 
 		row := map[string]any{}
 		for i, col := range cols {
+			// skip the 'needs backfill' column
+			if col == migrations.CNeedsBackfillColumn {
+				continue
+			}
+
 			// avoid having to cast int literals to int64 in tests
 			if v, ok := values[i].(int64); ok {
 				values[i] = int(v)
