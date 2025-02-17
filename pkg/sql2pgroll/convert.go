@@ -13,45 +13,49 @@ import (
 var ErrStatementCount = fmt.Errorf("expected exactly one statement")
 
 // Convert converts a SQL statement to a slice of pgroll operations.
-func Convert(sql string) (migrations.Operations, error) {
-	ops, err := convert(sql)
-	if err != nil {
-		return nil, err
-	}
-
-	if ops == nil {
-		return makeRawSQLOperation(sql), nil
-	}
-
-	return ops, nil
-}
-
-func convert(sql string) (migrations.Operations, error) {
+func Convert(sql string) (migrations.Migration, error) {
 	tree, err := pgq.Parse(sql)
 	if err != nil {
-		return nil, fmt.Errorf("parse error: %w", err)
+		return migrations.Migration{}, fmt.Errorf("parse error: %w", err)
 	}
 
+	var mig migrations.Migration
 	stmts := tree.GetStmts()
-	if len(stmts) != 1 {
-		return nil, fmt.Errorf("%w: got %d statements", ErrStatementCount, len(stmts))
-	}
-	node := stmts[0].GetStmt().GetNode()
+	for i, _ := range stmts {
+		node := stmts[i].GetStmt().GetNode()
 
-	switch node := (node).(type) {
-	case *pgq.Node_CreateStmt:
-		return convertCreateStmt(node.CreateStmt)
-	case *pgq.Node_AlterTableStmt:
-		return convertAlterTableStmt(node.AlterTableStmt)
-	case *pgq.Node_RenameStmt:
-		return convertRenameStmt(node.RenameStmt)
-	case *pgq.Node_DropStmt:
-		return convertDropStatement(node.DropStmt)
-	case *pgq.Node_IndexStmt:
-		return convertCreateIndexStmt(node.IndexStmt)
-	default:
-		return makeRawSQLOperation(sql), nil
+		var ops migrations.Operations
+		switch node := (node).(type) {
+		case *pgq.Node_CreateStmt:
+			ops, err = convertCreateStmt(node.CreateStmt)
+		case *pgq.Node_AlterTableStmt:
+			ops, err = convertAlterTableStmt(node.AlterTableStmt)
+			j := i + 1
+			for j < len(stmts) {
+				updateNode := stmts[j].GetStmt().GetNode()
+				if u, ok := updateNode.(*pgq.Node_UpdateStmt); ok {
+					colName, expr := getUpMigration(u.UpdateStmt)
+					fmt.Println(colName, expr)
+				}
+			}
+		case *pgq.Node_RenameStmt:
+			ops, err = convertRenameStmt(node.RenameStmt)
+		case *pgq.Node_DropStmt:
+			ops, err = convertDropStatement(node.DropStmt)
+		case *pgq.Node_IndexStmt:
+			ops, err = convertCreateIndexStmt(node.IndexStmt)
+		default:
+			ops = makeRawSQLOperation(sql)
+		}
+		if err != nil {
+			return migrations.Migration{
+				Name:       mig.Name,
+				Operations: makeRawSQLOperation(sql),
+			}, err
+		}
+		mig.Operations = append(mig.Operations, ops...)
 	}
+	return mig, nil
 }
 
 func makeRawSQLOperation(sql string) migrations.Operations {

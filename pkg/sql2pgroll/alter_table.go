@@ -337,6 +337,31 @@ func convertAlterTableDropConstraint(stmt *pgq.AlterTableStmt, cmd *pgq.AlterTab
 	}, nil
 }
 
+// Relation      *RangeVar   `protobuf:"bytes,1,opt,name=relation,proto3" json:"relation,omitempty"`
+// TargetList    []*Node     `protobuf:"bytes,2,rep,name=target_list,json=targetList,proto3" json:"target_list,omitempty"`
+// WhereClause   *Node       `protobuf:"bytes,3,opt,name=where_clause,json=whereClause,proto3" json:"where_clause,omitempty"`
+// FromClause    []*Node     `protobuf:"bytes,4,rep,name=from_clause,json=fromClause,proto3" json:"from_clause,omitempty"`
+// ReturningList []*Node     `protobuf:"bytes,5,rep,name=returning_list,json=returningList,proto3" json:"returning_list,omitempty"`
+// WithClause    *WithClause `protobuf:"bytes,6,opt,name=with_clause,json=withClause,proto3" json:"with_clause,omitempty"`
+func getUpMigration(stmt *pgq.UpdateStmt, column string) (string, string) {
+	return "", ""
+}
+
+func isUpdateContainsMigration(stmt *pgq.UpdateStmt, table, column string) bool {
+	if stmt.GetRelation().GetRelname() != table {
+		return false
+	}
+	for _, target := range stmt.GetTargetList() {
+		if restarget := target.GetResTarget(); restarget != nil {
+			if restarget.GetName() == column {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func canConvertDropConstraint(cmd *pgq.AlterTableCmd) bool {
 	return cmd.Behavior != pgq.DropBehavior_DROP_CASCADE
 }

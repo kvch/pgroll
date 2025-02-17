@@ -54,6 +54,10 @@ type SQLTransformer interface {
 	TransformSQL(sql string) (string, error)
 }
 
+type MigrationOperationAdder interface {
+	AddUpMigration(op Operation)
+}
+
 type SQLTransformerFunc func(string) (string, error)
 
 func (fn SQLTransformerFunc) TransformSQL(sql string) (string, error) {
