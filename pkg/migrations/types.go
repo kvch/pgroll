@@ -85,7 +85,7 @@ type Constraint struct {
 	Deferrable bool `json:"deferrable,omitempty"`
 
 	// Exclude constraint definition
-	Exclude *ConstraintExclude `json:"exclude,omitempty"`
+	Exclude *ExcludeConstraint `json:"exclude,omitempty"`
 
 	// IndexParameters corresponds to the JSON schema field "index_parameters".
 	IndexParameters *ConstraintIndexParameters `json:"index_parameters,omitempty"`
@@ -109,18 +109,6 @@ type Constraint struct {
 	Type ConstraintType `json:"type"`
 }
 
-// Exclude constraint definition
-type ConstraintExclude struct {
-	// Expressions of the exclude constraint
-	Elements string `json:"elements,omitempty"`
-
-	// Index method
-	IndexMethod string `json:"index_method,omitempty"`
-
-	// Predicate for the exclusion constraint
-	Predicate string `json:"predicate,omitempty"`
-}
-
 type ConstraintIndexParameters struct {
 	// IncludeColumns corresponds to the JSON schema field "include_columns".
 	IncludeColumns []string `json:"include_columns,omitempty"`
@@ -139,6 +127,18 @@ const ConstraintTypeExclude ConstraintType = "exclude"
 const ConstraintTypeForeignKey ConstraintType = "foreign_key"
 const ConstraintTypePrimaryKey ConstraintType = "primary_key"
 const ConstraintTypeUnique ConstraintType = "unique"
+
+// Exclude constraint definition
+type ExcludeConstraint struct {
+	// Expressions of the exclude constraint
+	Elements string `json:"elements,omitempty"`
+
+	// Index method
+	IndexMethod string `json:"index_method,omitempty"`
+
+	// Predicate for the exclusion constraint
+	Predicate string `json:"predicate,omitempty"`
+}
 
 type ForeignKeyAction string
 
@@ -248,6 +248,12 @@ type OpCreateConstraint struct {
 	// SQL expressions for down migrations
 	Down MultiColumnDownSQL `json:"down"`
 
+	// Exclude constraint definition
+	Exclude *ExcludeConstraint `json:"exclude,omitempty"`
+
+	// IndexParameters corresponds to the JSON schema field "index_parameters".
+	IndexParameters *OpCreateConstraintIndexParameters `json:"index_parameters,omitempty"`
+
 	// Name of the constraint
 	Name string `json:"name"`
 
@@ -267,9 +273,21 @@ type OpCreateConstraint struct {
 	Up MultiColumnUpSQL `json:"up"`
 }
 
+type OpCreateConstraintIndexParameters struct {
+	// IncludeColumns corresponds to the JSON schema field "include_columns".
+	IncludeColumns []string `json:"include_columns,omitempty"`
+
+	// StorageParameters corresponds to the JSON schema field "storage_parameters".
+	StorageParameters string `json:"storage_parameters,omitempty"`
+
+	// Tablespace corresponds to the JSON schema field "tablespace".
+	Tablespace string `json:"tablespace,omitempty"`
+}
+
 type OpCreateConstraintType string
 
 const OpCreateConstraintTypeCheck OpCreateConstraintType = "check"
+const OpCreateConstraintTypeExclude OpCreateConstraintType = "exclude"
 const OpCreateConstraintTypeForeignKey OpCreateConstraintType = "foreign_key"
 const OpCreateConstraintTypeUnique OpCreateConstraintType = "unique"
 

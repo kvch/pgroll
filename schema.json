@@ -26,6 +26,28 @@
       "required": ["constraint", "name"],
       "type": "object"
     },
+    "ExcludeConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Exclude constraint definition",
+      "properties": {
+        "index_method": {
+          "description": "Index method",
+          "type": "string",
+          "default": ""
+        },
+        "elements": {
+          "type": "string",
+          "default": "",
+          "description": "Expressions of the exclude constraint"
+        },
+        "predicate": {
+          "type": "string",
+          "description": "Predicate for the exclusion constraint",
+          "default": ""
+        }
+      }
+    },
     "Column": {
       "additionalProperties": false,
       "description": "Column definition",
@@ -248,26 +270,8 @@
           "$ref": "#/$defs/TableForeignKeyReference"
         },
         "exclude": {
-          "type": "object",
-          "additionalProperties": false,
           "description": "Exclude constraint definition",
-          "properties": {
-            "index_method": {
-              "description": "Index method",
-              "type": "string",
-              "default": ""
-            },
-            "elements": {
-              "type": "string",
-              "default": "",
-              "description": "Expressions of the exclude constraint"
-            },
-            "predicate": {
-              "type": "string",
-              "description": "Predicate for the exclusion constraint",
-              "default": ""
-            }
-          }
+          "$ref": "#/$defs/ExcludeConstraint"
         },
         "index_parameters": {
           "type": "object",
@@ -793,11 +797,35 @@
         "type": {
           "description": "Type of the constraint",
           "type": "string",
-          "enum": ["unique", "check", "foreign_key"]
+          "enum": ["unique", "check", "foreign_key", "exclude"]
         },
         "check": {
           "description": "Check constraint expression",
           "type": "string"
+        },
+        "exclude": {
+          "description": "Exclude constraint definition",
+          "$ref": "#/$defs/ExcludeConstraint"
+        },
+        "index_parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tablespace": {
+              "type": "string",
+              "default": ""
+            },
+            "storage_parameters": {
+              "type": "string",
+              "default": ""
+            },
+            "include_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         },
         "no_inherit": {
           "description": "Do not propagate constraint to child tables",
@@ -833,6 +861,12 @@
               },
               "no_inherit": {
                 "const": false
+              },
+              "exclude": {
+                "const": {}
+              },
+              "index_params": {
+                "const": {}
               }
             },
             "required": ["columns", "references"]
@@ -853,9 +887,38 @@
               },
               "references": {
                 "const": {}
+              },
+              "index_params": {
+                "const": {}
               }
             },
             "required": ["check"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "exclude"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "check": {
+                "const": ""
+              },
+              "references": {
+                "const": {}
+              },
+              "no_inherit": {
+                "const": false
+              },
+              "columns": {
+                "const": []
+              }
+            },
+            "required": ["exclude"]
           }
         }
       ],

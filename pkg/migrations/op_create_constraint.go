@@ -87,6 +87,9 @@ func (o *OpCreateConstraint) Start(ctx context.Context, conn db.DB, latestSchema
 		return table, o.addCheckConstraint(ctx, conn, table.Name)
 	case OpCreateConstraintTypeForeignKey:
 		return table, o.addForeignKeyConstraint(ctx, conn, table)
+	case OpCreateConstraintTypeExclude:
+		// similar to create index concurrently
+		return table, o.addForeignKeyConstraint(ctx, conn, table)
 	}
 
 	return table, nil
@@ -125,6 +128,8 @@ func (o *OpCreateConstraint) Complete(ctx context.Context, conn db.DB, tr SQLTra
 		if err != nil {
 			return err
 		}
+	case OpCreateConstraintTypeExclude:
+		// use index for exclude constraint
 	}
 
 	for _, col := range o.Columns {
@@ -258,6 +263,10 @@ func (o *OpCreateConstraint) Validate(ctx context.Context, s *schema.Schema) err
 					Name:  col,
 				}
 			}
+		}
+	case OpCreateConstraintTypeExclude:
+		if o.Exclude == nil {
+			return FieldRequiredError{Name: "exclude"}
 		}
 	}
 
