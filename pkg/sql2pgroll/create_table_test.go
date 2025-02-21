@@ -353,6 +353,7 @@ func TestUnconvertableCreateTableStatements(t *testing.T) {
 		"CREATE TABLE foo(a int UNIQUE DEFERRABLE INITIALLY DEFERRED)",
 		"CREATE TABLE foo(a int PRIMARY KEY DEFERRABLE INITIALLY DEFERRED)",
 		"CREATE TABLE foo(a int REFERENCES bar(b) DEFERRABLE INITIALLY DEFERRED)",
+		"CREATE TABLE foo(a int UNIQUE DEFERRABLE REFERENCES bar(b) DEFERRABLE)",
 	}
 
 	for _, sql := range tests {
