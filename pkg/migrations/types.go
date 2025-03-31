@@ -3,8 +3,6 @@
 
 package migrations
 
-import "github.com/oapi-codegen/nullable"
-
 // Check constraint definition
 type CheckConstraint struct {
 	// Constraint expression
@@ -242,11 +240,11 @@ type OpAlterColumn struct {
 	Column string `json:"column" yaml:"column"`
 
 	// New comment on the column
-	Comment nullable.Nullable[string] `json:"comment,omitempty" yaml:"comment,omitempty"`
+	Comment Nullable[string] `json:"comment,omitempty" yaml:"comment,omitempty"`
 
 	// Default value of the column. Setting to null will drop the default if it was
 	// set previously.
-	Default nullable.Nullable[string] `json:"default,omitempty" yaml:"default,omitempty"`
+	Default Nullable[string] `json:"default,omitempty" yaml:"default,omitempty"`
 
 	// SQL expression for down migration
 	Down string `json:"down" yaml:"down"`

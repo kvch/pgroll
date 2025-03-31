@@ -5,7 +5,6 @@ package sql2pgroll
 import (
 	"fmt"
 
-	"github.com/oapi-codegen/nullable"
 	pgq "github.com/xataio/pg_query_go/v6"
 
 	"github.com/xataio/pgroll/pkg/migrations"
@@ -283,7 +282,7 @@ func convertAlterTableSetColumnDefault(stmt *pgq.AlterTableStmt, cmd *pgq.AlterT
 
 	// We're not setting it to anything, which is the case when we are dropping it
 	if cmd.GetBehavior() == pgq.DropBehavior_DROP_RESTRICT {
-		operation.Default = nullable.NewNullNullable[string]()
+		operation.Default = migrations.NewNullNullable[string]()
 		return operation, nil
 	}
 
@@ -291,10 +290,10 @@ func convertAlterTableSetColumnDefault(stmt *pgq.AlterTableStmt, cmd *pgq.AlterT
 	return nil, nil
 }
 
-func extractDefault(node *pgq.Node) (nullable.Nullable[string], error) {
+func extractDefault(node *pgq.Node) (migrations.Nullable[string], error) {
 	if c := node.GetAConst(); c != nil && c.GetIsnull() {
 		// The default can be set to null
-		return nullable.NewNullNullable[string](), nil
+		return migrations.NewNullNullable[string](), nil
 	}
 
 	// It's an expression
@@ -303,7 +302,7 @@ func extractDefault(node *pgq.Node) (nullable.Nullable[string], error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to deparse expression: %w", err)
 		}
-		return nullable.NewNullableWithValue(def), nil
+		return migrations.NewNullableWithValue(def), nil
 	}
 
 	return nil, nil

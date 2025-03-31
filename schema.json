@@ -524,9 +524,8 @@
           "description": "Default value of the column. Setting to null will drop the default if it was set previously.",
           "type": ["string", "null"],
           "goJSONSchema": {
-            "imports": ["github.com/oapi-codegen/nullable"],
             "nillable": true,
-            "type": "nullable.Nullable[string]"
+            "type": "Nullable[string]"
           }
         },
         "nullable": {
@@ -553,9 +552,8 @@
           "description": "New comment on the column",
           "type": ["string", "null"],
           "goJSONSchema": {
-            "imports": ["github.com/oapi-codegen/nullable"],
             "nillable": true,
-            "type": "nullable.Nullable[string]"
+            "type": "Nullable[string]"
           }
         },
         "up": {
