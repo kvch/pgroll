@@ -5,9 +5,6 @@ package migrations
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-
-	"gopkg.in/yaml.v3"
 )
 
 type Nullable[T any] map[bool]T
@@ -75,14 +72,14 @@ func (n *Nullable[T]) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (n *Nullable[T]) UnmarshalYAML(node *yaml.Node) error {
-	fmt.Println(node)
-	var value T
-	if err := node.Decode(&value); err != nil {
-		fmt.Println(err)
-		return err
-	}
-	fmt.Println(value)
-	*n = NewNullableWithValue(value)
-	return nil
-}
+//func (n *Nullable[T]) UnmarshalYAML(node *yaml.Node) error {
+//	fmt.Println(node)
+//	var value T
+//	if err := node.Decode(&value); err != nil {
+//		fmt.Println(err)
+//		return err
+//	}
+//	fmt.Println(value)
+//	*n = NewNullableWithValue(value)
+//	return nil
+//}
