@@ -17,7 +17,7 @@ import (
 // * Renames a duplicated column to its original name
 // * Renames any foreign keys on the duplicated column to their original name.
 // * Validates and renames any temporary `CHECK` constraints on the duplicated column.
-func RenameDuplicatedColumn(ctx context.Context, conn db.DB, table *schema.Table, column *schema.Column) error {
+func RenameDuplicatedColumn(ctx context.Context, conn db.DB, schemaName string, table *schema.Table, column *schema.Column) error {
 	const (
 		cValidateConstraintSQL     = `ALTER TABLE IF EXISTS %s VALIDATE CONSTRAINT %s`
 		cSetNotNullSQL             = `ALTER TABLE IF EXISTS %s ALTER COLUMN %s SET NOT NULL`
@@ -25,6 +25,9 @@ func RenameDuplicatedColumn(ctx context.Context, conn db.DB, table *schema.Table
 		cCreateUniqueConstraintSQL = `ALTER TABLE IF EXISTS %s ADD CONSTRAINT %s UNIQUE USING INDEX %s`
 		cRenameIndexSQL            = `ALTER INDEX IF EXISTS %s RENAME TO %s`
 	)
+	if !isColumnDuplicated(ctx, conn, schemaName, table.Name, column.Name) {
+		return nil
+	}
 
 	err := NewRenameColumnAction(conn, table.Name, TemporaryName(column.Name), column.Name).Execute(ctx)
 	if err != nil {
@@ -137,4 +140,20 @@ func RenameDuplicatedColumn(ctx context.Context, conn db.DB, table *schema.Table
 	}
 
 	return nil
+}
+
+func isColumnDuplicated(ctx context.Context, conn db.DB, schemaName, tableName, columnName string) bool {
+	rows, err := conn.QueryContext(ctx, fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=%s AND table_name=%s AND column_name=%s)", pq.QuoteLiteral(schemaName), pq.QuoteLiteral(tableName), pq.QuoteLiteral(TemporaryName(columnName))))
+	if err != nil {
+		fmt.Println("errror while checking existence", err, columnName)
+		return false
+	}
+	if rows != nil {
+		var columnExists bool
+		if err := db.ScanFirstValue(rows, &columnExists); err != nil {
+			return false
+		}
+		return columnExists
+	}
+	return false
 }

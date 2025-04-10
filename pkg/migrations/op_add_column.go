@@ -100,7 +100,11 @@ func (o *OpAddColumn) Start(ctx context.Context, conn db.DB, latestSchema string
 	}
 
 	table.AddColumn(o.Column.Name, &schema.Column{
-		Name: TemporaryName(o.Column.Name),
+		Name:     TemporaryName(o.Column.Name),
+		Type:     o.Column.Type,
+		Default:  o.Column.Default,
+		Nullable: o.Column.Nullable,
+		Unique:   o.Column.Unique,
 	})
 
 	return tableToBackfill, nil

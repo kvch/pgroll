@@ -127,7 +127,7 @@ func (o *OpAlterColumn) Complete(ctx context.Context, conn db.DB, s *schema.Sche
 	if column == nil {
 		return ColumnDoesNotExistError{Table: o.Table, Name: o.Column}
 	}
-	if err := RenameDuplicatedColumn(ctx, conn, table, column); err != nil {
+	if err := RenameDuplicatedColumn(ctx, conn, s.Name, table, column); err != nil {
 		return err
 	}
 

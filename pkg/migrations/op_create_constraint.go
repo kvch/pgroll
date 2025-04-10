@@ -137,7 +137,7 @@ func (o *OpCreateConstraint) Complete(ctx context.Context, conn db.DB, s *schema
 		}
 	}
 
-	removeOldColumns := NewDropColumnAction(conn, o.Table, o.Columns...)
+	removeOldColumns := NewTryDropColumnAction(conn, o.Table, o.Columns...)
 	err := removeOldColumns.Execute(ctx)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func (o *OpCreateConstraint) Complete(ctx context.Context, conn db.DB, s *schema
 		if column == nil {
 			return ColumnDoesNotExistError{Table: o.Table, Name: col}
 		}
-		if err := RenameDuplicatedColumn(ctx, conn, table, column); err != nil {
+		if err := RenameDuplicatedColumn(ctx, conn, s.Name, table, column); err != nil {
 			return err
 		}
 	}

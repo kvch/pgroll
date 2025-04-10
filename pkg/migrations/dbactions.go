@@ -4,12 +4,17 @@ package migrations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/xataio/pgroll/pkg/db"
+)
+
+const (
+	dependentObjectError string = "dependent_objects_still_exist"
 )
 
 // DBAction is an interface for common database actions
@@ -24,6 +29,7 @@ type dropColumnAction struct {
 
 	table   string
 	columns []string
+	canFail bool
 }
 
 func NewDropColumnAction(conn db.DB, table string, columns ...string) *dropColumnAction {
@@ -34,10 +40,29 @@ func NewDropColumnAction(conn db.DB, table string, columns ...string) *dropColum
 	}
 }
 
+func NewTryDropColumnAction(conn db.DB, table string, columns ...string) *dropColumnAction {
+	return &dropColumnAction{
+		conn:    conn,
+		table:   table,
+		columns: columns,
+		canFail: true,
+	}
+}
+
 func (a *dropColumnAction) Execute(ctx context.Context) error {
 	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s %s",
 		pq.QuoteIdentifier(a.table),
 		a.dropMultipleColumns()))
+
+	if err != nil && a.canFail {
+		var pqErr *pq.Error
+		if ok := errors.As(err, &pqErr); ok {
+			if pqErr.Code.Name() == dependentObjectError {
+				return nil
+			}
+		}
+	}
+
 	return err
 }
 

@@ -280,7 +280,7 @@ func (d *duplicatorStmtBuilder) duplicateColumn(
 	withType string,
 ) string {
 	const (
-		cAlterTableSQL         = `ALTER TABLE %s ADD COLUMN %s %s`
+		cAlterTableSQL         = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s`
 		cAddCheckConstraintSQL = `ADD CONSTRAINT %s %s NOT VALID`
 	)
 

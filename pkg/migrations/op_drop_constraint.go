@@ -107,7 +107,7 @@ func (o *OpDropConstraint) Complete(ctx context.Context, conn db.DB, s *schema.S
 	}
 
 	// Rename the new column to the old column name
-	if err := RenameDuplicatedColumn(ctx, conn, table, column); err != nil {
+	if err := RenameDuplicatedColumn(ctx, conn, s.Name, table, column); err != nil {
 		return err
 	}
 

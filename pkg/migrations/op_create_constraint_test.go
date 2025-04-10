@@ -1225,6 +1225,103 @@ func TestCreateConstraintInMultiOperationMigrations(t *testing.T) {
 				TableMustBeCleanedUp(t, db, schema, "products", "name")
 			},
 		},
+		{
+			name: "create table, add column, create unique constraint",
+			migrations: []migrations.Migration{
+				{
+					Name: "01_create_table",
+					Operations: migrations.Operations{
+						&migrations.OpCreateTable{
+							Name: "users",
+							Columns: []migrations.Column{
+								{
+									Name: "id",
+									Type: "int",
+									Pk:   true,
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "02_multi_operation",
+					Operations: migrations.Operations{
+						&migrations.OpAddColumn{
+							Table: "users",
+							Column: migrations.Column{
+								Name:     "name",
+								Type:     "text",
+								Nullable: true,
+							},
+						},
+						&migrations.OpCreateConstraint{
+							Table:   "users",
+							Type:    migrations.OpCreateConstraintTypeUnique,
+							Name:    "my_unique_constraint",
+							Columns: []string{"name"},
+							Up: map[string]string{
+								"name": "name || '2'",
+							},
+							Down: map[string]string{
+								"name": "name",
+							},
+						},
+					},
+				},
+			},
+			afterStart: func(t *testing.T, db *sql.DB, schema string) {
+				// Can insert a row into the users table
+				MustInsert(t, db, schema, "02_multi_operation", "users", map[string]string{
+					"id":   "1",
+					"name": "alice",
+				})
+
+				// Can't insert a row that violates the constraint into the new schema
+				MustNotInsert(t, db, schema, "02_multi_operation", "users", map[string]string{
+					"id":   "2",
+					"name": "alice",
+				}, testutils.UniqueViolationErrorCode)
+
+				// The new view has the expected rows
+				rows := MustSelect(t, db, schema, "02_multi_operation", "users")
+				assert.Equal(t, []map[string]any{
+					{"id": 1, "name": "alice"},
+				}, rows)
+
+				// The old view has the expected rows
+				rows = MustSelect(t, db, schema, "01_create_table", "users")
+				assert.Equal(t, []map[string]any{
+					{"id": 1},
+				}, rows)
+			},
+			afterRollback: func(t *testing.T, db *sql.DB, schema string) {
+				// The table has been cleaned up
+				TableMustBeCleanedUp(t, db, schema, "users", "name")
+			},
+			afterComplete: func(t *testing.T, db *sql.DB, schema string) {
+				// Can insert a row that meets the constraint into the new schema
+				MustInsert(t, db, schema, "02_multi_operation", "users", map[string]string{
+					"id":   "3",
+					"name": "carol",
+				})
+
+				// Can't insert a row into the new schema that violates the constraint
+				MustNotInsert(t, db, schema, "02_multi_operation", "users", map[string]string{
+					"id":   "4",
+					"name": "carol",
+				}, testutils.UniqueViolationErrorCode)
+
+				// The new view has the expected rows
+				rows := MustSelect(t, db, schema, "02_multi_operation", "users")
+				assert.Equal(t, []map[string]any{
+					{"id": 1, "name": nil},
+					{"id": 3, "name": "carol"},
+				}, rows)
+
+				// The table has been cleaned up
+				TableMustBeCleanedUp(t, db, schema, "users", "name")
+			},
+		},
 	})
 }
 
