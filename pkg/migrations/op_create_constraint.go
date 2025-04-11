@@ -23,7 +23,17 @@ func (o *OpCreateConstraint) Start(ctx context.Context, conn db.DB, latestSchema
 
 	columns := make([]*schema.Column, len(o.Columns))
 	for i, colName := range o.Columns {
-		columns[i] = table.GetColumn(colName)
+		c := table.GetColumn(colName)
+		isDuplicated := c.Duplicated
+		for isDuplicated {
+			duplicatedCol := table.GetColumn(TemporaryName(c.Name))
+			if duplicatedCol == nil {
+				break
+			}
+			c = duplicatedCol
+			isDuplicated = duplicatedCol.Duplicated
+		}
+		columns[i] = c
 		if columns[i] == nil {
 			return nil, ColumnDoesNotExistError{Table: o.Table, Name: colName}
 		}
@@ -32,7 +42,17 @@ func (o *OpCreateConstraint) Start(ctx context.Context, conn db.DB, latestSchema
 	// Duplicate each column using its final name after migration completion
 	d := NewColumnDuplicator(conn, table, columns...)
 	for _, colName := range o.Columns {
-		d = d.WithName(table.GetColumn(colName).Name, TemporaryName(colName))
+		c := table.GetColumn(colName)
+		isDuplicated := c.Duplicated
+		for isDuplicated {
+			duplicatedCol := table.GetColumn(TemporaryName(c.Name))
+			if duplicatedCol == nil {
+				break
+			}
+			c = duplicatedCol
+			isDuplicated = duplicatedCol.Duplicated
+		}
+		d = d.WithName(c.Name, TemporaryName(c.Name))
 	}
 	if err := d.Duplicate(ctx); err != nil {
 		return nil, fmt.Errorf("failed to duplicate columns for new constraint: %w", err)
@@ -137,7 +157,7 @@ func (o *OpCreateConstraint) Complete(ctx context.Context, conn db.DB, s *schema
 		}
 	}
 
-	removeOldColumns := NewTryDropColumnAction(conn, o.Table, o.Columns...)
+	removeOldColumns := NewDropColumnAction(conn, o.Table, o.Columns...)
 	err := removeOldColumns.Execute(ctx)
 	if err != nil {
 		return err

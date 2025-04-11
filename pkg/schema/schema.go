@@ -89,6 +89,9 @@ type Column struct {
 
 	// Postgres type type, e.g enum, composite, range
 	PostgresType string `json:"postgresType"`
+
+	// Duplicated internal column to see if the column was already duplicated
+	Duplicated bool `json:"-"`
 }
 
 // Index represents an index on a table
