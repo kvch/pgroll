@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq"
+	"github.com/pterm/pterm"
 
 	"github.com/xataio/pgroll/pkg/db"
 	"github.com/xataio/pgroll/pkg/schema"
@@ -18,16 +19,16 @@ type Operation interface {
 	// version in the database (through a view)
 	// update the given views to expose the new schema version
 	// Returns the table that requires backfilling, if any.
-	Start(ctx context.Context, conn db.DB, latestSchema string, s *schema.Schema) (*schema.Table, error)
+	Start(ctx context.Context, logger pterm.Logger, conn db.DB, latestSchema string, s *schema.Schema) (*schema.Table, error)
 
 	// Complete will update the database schema to match the current version
 	// after calling Start.
 	// This method should be called once the previous version is no longer used.
-	Complete(ctx context.Context, conn db.DB, s *schema.Schema) error
+	Complete(ctx context.Context, logger pterm.Logger, conn db.DB, s *schema.Schema) error
 
 	// Rollback will revert the changes made by Start. It is not possible to
 	// rollback a completed migration.
-	Rollback(ctx context.Context, conn db.DB, s *schema.Schema) error
+	Rollback(ctx context.Context, logger pterm.Logger, conn db.DB, s *schema.Schema) error
 
 	// Validate returns a descriptive error if the operation cannot be applied to the given schema.
 	Validate(ctx context.Context, s *schema.Schema) error

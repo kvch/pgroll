@@ -86,7 +86,7 @@ func (m *Roll) StartDDLOperations(ctx context.Context, migration *migrations.Mig
 	// execute operations
 	var tablesToBackfill []*schema.Table
 	for _, op := range migration.Operations {
-		table, err := op.Start(ctx, m.pgConn, latestSchema, newSchema)
+		table, err := op.Start(ctx, m.logger, m.pgConn, latestSchema, newSchema)
 		if err != nil {
 			errRollback := m.Rollback(ctx)
 			if errRollback != nil {
@@ -322,6 +322,7 @@ func (m *Roll) performBackfills(ctx context.Context, tables []*schema.Table, cfg
 	bf := backfill.New(m.pgConn, cfg)
 
 	for _, table := range tables {
+		m.logger.Info("Backfilling started", m.logger.Args("table", table.Name))
 		if err := bf.Start(ctx, table); err != nil {
 			errRollback := m.Rollback(ctx)
 
@@ -329,6 +330,7 @@ func (m *Roll) performBackfills(ctx context.Context, tables []*schema.Table, cfg
 				fmt.Errorf("unable to backfill table %q: %w", table.Name, err),
 				errRollback)
 		}
+		m.logger.Info("Backfilling completed", m.logger.Args("table", table.Name))
 	}
 
 	return nil
