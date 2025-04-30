@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -20,7 +21,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new migration interactively",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := pterm.DefaultInteractiveTextInput.WithDefaultText("Set the name of your migration").Show()
-		outputFormat, _ := pterm.DefaultInteractiveSelect.WithDefaultText("File format").WithOptions([]string{"yaml", "json"}).WithDefaultOption("yaml").Show()
+		outputFormat, _ := pterm.DefaultInteractiveSelect.WithDefaultText("File format").WithMaxHeight(7).WithOptions([]string{"yaml", "json"}).WithDefaultOption("yaml").Show()
 		addMoreOperations := true
 
 		mig := &migrations.Migration{}
@@ -36,7 +37,49 @@ var createCmd = &cobra.Command{
 				case reflect.String:
 					selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
 					value.Field(i).SetString(selected)
+				case reflect.Bool:
+					selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
+					selectedBool, _ := strconv.ParseBool(selected)
+					value.Field(i).SetBool(selectedBool)
+				case reflect.Slice:
+					addElems, _ := pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
+					if addElems {
+						elemSlice := reflect.MakeSlice(opSetting.Type, 0, 1)
+						for addElems {
+							elemType := opSetting.Type.Elem()
+							newElem := reflect.New(elemType)
+							for j := 0; j < elemType.NumField(); j++ {
+								elemAttr := elemType.Field(j)
+								switch elemAttr.Type.Kind() {
+								case reflect.String:
+									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+									reflect.Indirect(newElem).Field(j).SetString(selected)
+								case reflect.Bool:
+									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+									selectedBool, _ := strconv.ParseBool(selected)
+									reflect.Indirect(newElem).Field(j).SetBool(selectedBool)
+								case reflect.Pointer:
+									//fmt.Println(elemAttr.Type.Elem())
+									//newVal := reflect.New(elemAttr.Type.Elem())
+									if elemAttr.Type.Elem().Kind() != reflect.String {
+										continue
+									}
+									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+									if selected != "" {
+										reflect.Indirect(newElem).Field(j).Set(reflect.ValueOf(&selected))
+									}
+								default:
+									continue
+									//fmt.Println(elemAttr.Type.Kind())
+								}
+							}
+							elemSlice = reflect.Append(elemSlice, reflect.Indirect(newElem))
+							addElems, _ = pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
+						}
+						value.Field(i).Set(elemSlice)
+					}
 				default:
+					//fmt.Println(opSetting.Type.Kind())
 					continue
 				}
 
