@@ -488,6 +488,9 @@ type PgRollMigration struct {
 
 	// Operations corresponds to the JSON schema field "operations".
 	Operations PgRollOperations `json:"operations"`
+
+	// Migration format version
+	Version string `json:"version,omitempty"`
 }
 
 type PgRollOperation interface{}

@@ -1162,6 +1162,11 @@
           "description": "Name of the migration",
           "type": "string"
         },
+        "version": {
+          "description": "Migration format version",
+            "type": "string",
+            "default": ""
+        },
         "operations": {
           "$ref": "#/$defs/PgRollOperations"
         }
