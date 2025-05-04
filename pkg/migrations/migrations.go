@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
 	_ "github.com/lib/pq"
 	"sigs.k8s.io/yaml"
@@ -35,6 +36,37 @@ type Operation interface {
 	// Validate returns a descriptive error if the operation cannot be applied to the given schema.
 	Validate(ctx context.Context, s *schema.Schema) error
 }
+
+type OptionLister interface {
+	Options() []Option
+}
+
+type OptionSetter func(any)
+type OperationSetter func(Operation)
+type OptionCallback func(any) OperationSetter
+
+type Option struct {
+	Name       string
+	OptionType OptionType
+	Default    string
+	Enum       []string
+	Slice      OptionLister
+	Element    reflect.Type
+	Setter     OptionSetter
+	OpSetter   OptionCallback
+}
+
+type OptionType uint
+
+const (
+	InvalidOptionType = iota
+	StringOption
+	NullableStringOption
+	IntegerOption
+	BoolOption
+	EnumOption
+	SliceOption
+)
 
 // IsolatedOperation is an operation that cannot be executed with other operations
 // in the same migration.

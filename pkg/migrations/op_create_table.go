@@ -5,6 +5,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -273,6 +274,129 @@ func (o *OpCreateTable) updateSchema(s *schema.Schema) *schema.Schema {
 	})
 
 	return s
+}
+
+func (op *OpCreateTable) Options() []Option {
+	return []Option{
+		{
+			Name:       "name",
+			OptionType: StringOption,
+			OpSetter:   withName,
+		},
+		{
+			Name:       "columns",
+			OptionType: SliceOption,
+			Element:    reflect.TypeOf(Column{}),
+		},
+		{
+			Name:       "comment",
+			OptionType: NullableStringOption,
+			OpSetter:   withComment,
+		},
+		{
+			Name:       "constraints",
+			OptionType: SliceOption,
+		},
+	}
+}
+
+///// Check constraint for the column
+///Check *CheckConstraint `json:"check,omitempty"`
+
+///// Postgres comment for the column
+///Comment *string `json:"comment,omitempty"`
+
+///// Default value for the column
+///Default *string `json:"default,omitempty"`
+
+///// Generated column definition
+///Generated *ColumnGenerated `json:"generated,omitempty"`
+
+///// Name of the column
+///Name string `json:"name"`
+
+///// Indicates if the column is nullable
+///Nullable bool `json:"nullable,omitempty"`
+
+///// Indicates if the column is part of the primary key
+///Pk bool `json:"pk,omitempty"`
+
+///// Foreign key constraint for the column
+///References *ForeignKeyReference `json:"references,omitempty"`
+
+///// Postgres type of the column
+///Type string `json:"type"`
+
+// /// Indicates if the column values must be unique
+// /Unique bool `json:"unique,omitempty"`
+func (c *Column) Options() []Option {
+	return []Option{
+		// TODO
+		// Setter:
+		{
+			Name:       "name",
+			OptionType: StringOption,
+		},
+		{
+			Name:       "type",
+			OptionType: StringOption,
+		},
+		{
+			Name:       "pk",
+			OptionType: BoolOption,
+		},
+		{
+			Name:       "nullable",
+			OptionType: BoolOption,
+		},
+		{
+			Name:       "unique",
+			OptionType: BoolOption,
+		},
+		{
+			Name:       "default",
+			OptionType: NullableStringOption,
+		},
+		{
+			Name:       "comment",
+			OptionType: NullableStringOption,
+		},
+	}
+}
+
+func appendColumn(column any) OperationSetter {
+	if c, ok := column.(Column); ok {
+		return func(op Operation) {
+			if o, ok := op.(*OpCreateTable); ok {
+				o.Columns = append(o.Columns, c)
+			}
+		}
+	}
+	return func(Operation) {}
+}
+
+func withName(name any) OperationSetter {
+	if n, ok := name.(string); ok {
+		return func(op Operation) {
+			if o, ok := op.(*OpCreateTable); ok {
+				o.Name = n
+			}
+		}
+	}
+	return func(Operation) {}
+}
+
+func withComment(comment any) OperationSetter {
+	if comment == nil {
+		return func(Operation) {}
+	}
+	return func(op Operation) {
+		if c, ok := comment.(string); ok {
+			if o, ok := op.(*OpCreateTable); ok {
+				o.Comment = &c
+			}
+		}
+	}
 }
 
 func columnsToSQL(cols []Column) (string, error) {

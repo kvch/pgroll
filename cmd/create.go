@@ -30,62 +30,97 @@ var createCmd = &cobra.Command{
 			pterm.Info.Printfln("Selected option: %s", pterm.Green(selectedOption))
 			op, _ := migrations.OperationFromName(migrations.OpName(selectedOption))
 			mig.Operations = append(mig.Operations, op)
-			for i := 0; i < reflect.Indirect(reflect.ValueOf(op)).Type().NumField(); i++ {
-				value := reflect.Indirect(reflect.ValueOf(op))
-				opSetting := value.Type().Field(i)
-				switch opSetting.Type.Kind() {
-				case reflect.String:
-					selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
-					value.Field(i).SetString(selected)
-				case reflect.Bool:
-					selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
-					selectedBool, _ := strconv.ParseBool(selected)
-					value.Field(i).SetBool(selectedBool)
-				case reflect.Slice:
-					addElems, _ := pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
-					if addElems {
-						elemSlice := reflect.MakeSlice(opSetting.Type, 0, 1)
-						for addElems {
-							elemType := opSetting.Type.Elem()
-							newElem := reflect.New(elemType)
-							for j := 0; j < elemType.NumField(); j++ {
-								elemAttr := elemType.Field(j)
-								switch elemAttr.Type.Kind() {
-								case reflect.String:
-									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
-									reflect.Indirect(newElem).Field(j).SetString(selected)
-								case reflect.Bool:
-									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
-									selectedBool, _ := strconv.ParseBool(selected)
-									reflect.Indirect(newElem).Field(j).SetBool(selectedBool)
-								case reflect.Pointer:
-									//fmt.Println(elemAttr.Type.Elem())
-									//newVal := reflect.New(elemAttr.Type.Elem())
-									if elemAttr.Type.Elem().Kind() != reflect.String {
-										continue
-									}
-									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
-									if selected != "" {
-										reflect.Indirect(newElem).Field(j).Set(reflect.ValueOf(&selected))
-									}
+			if listable, ok := op.(migrations.OptionLister); ok {
+				fmt.Println("listable")
+				for _, option := range listable.Options() {
+					switch option.OptionType {
+					case migrations.StringOption:
+						selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(option.Name)).Show()
+						option.OpSetter(selected)(op)
+					case migrations.SliceOption:
+						addElems, _ := pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", option.Name)).Show()
+						if !addElems {
+							continue
+						}
+						newElem := reflect.New(option.Element).Interface()
+						if listableElem, ok := newElem.(migrations.OptionLister); ok {
+							for _, elemOption := range listableElem.Options() {
+								switch elemOption.OptionType {
+								case migrations.StringOption:
+									selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(elemOption.Name).Show()
+									elemOption.Setter(selected)(newElem)
+								case migrations.SliceOption:
+									fmt.Println(elemOption.Name)
 								default:
-									continue
-									//fmt.Println(elemAttr.Type.Kind())
+									fmt.Println(elemOption.Name, elemOption.OptionType)
 								}
 							}
-							elemSlice = reflect.Append(elemSlice, reflect.Indirect(newElem))
-							addElems, _ = pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
 						}
-						value.Field(i).Set(elemSlice)
-					}
-				default:
-					//fmt.Println(opSetting.Type.Kind())
-					continue
-				}
 
+					default:
+						fmt.Println(option.Name, option.OptionType)
+					}
+
+				}
+			} else {
+				for i := 0; i < reflect.Indirect(reflect.ValueOf(op)).Type().NumField(); i++ {
+					value := reflect.Indirect(reflect.ValueOf(op))
+					opSetting := value.Type().Field(i)
+					switch opSetting.Type.Kind() {
+					case reflect.String:
+						selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
+						value.Field(i).SetString(selected)
+					case reflect.Bool:
+						selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(opSetting.Name)).Show()
+						selectedBool, _ := strconv.ParseBool(selected)
+						value.Field(i).SetBool(selectedBool)
+					case reflect.Slice:
+						addElems, _ := pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
+						if addElems {
+							elemSlice := reflect.MakeSlice(opSetting.Type, 0, 1)
+							for addElems {
+								elemType := opSetting.Type.Elem()
+								newElem := reflect.New(elemType)
+								for j := 0; j < elemType.NumField(); j++ {
+									elemAttr := elemType.Field(j)
+									switch elemAttr.Type.Kind() {
+									case reflect.String:
+										selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+										reflect.Indirect(newElem).Field(j).SetString(selected)
+									case reflect.Bool:
+										selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+										selectedBool, _ := strconv.ParseBool(selected)
+										reflect.Indirect(newElem).Field(j).SetBool(selectedBool)
+									case reflect.Pointer:
+										//fmt.Println(elemAttr.Type.Elem())
+										//newVal := reflect.New(elemAttr.Type.Elem())
+										if elemAttr.Type.Elem().Kind() != reflect.String {
+											continue
+										}
+										selected, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(strings.ToLower(elemAttr.Name)).Show()
+										if selected != "" {
+											reflect.Indirect(newElem).Field(j).Set(reflect.ValueOf(&selected))
+										}
+									default:
+										continue
+										//fmt.Println(elemAttr.Type.Kind())
+									}
+								}
+								elemSlice = reflect.Append(elemSlice, reflect.Indirect(newElem))
+								addElems, _ = pterm.DefaultInteractiveConfirm.WithDefaultValue(true).WithDefaultText(fmt.Sprintf("Add %s", strings.ToLower(opSetting.Name))).Show()
+							}
+							value.Field(i).Set(elemSlice)
+						}
+					default:
+						//fmt.Println(opSetting.Type.Kind())
+						continue
+					}
+
+				}
 			}
 			addMoreOperations, _ = pterm.DefaultInteractiveConfirm.WithDefaultText("Add more operations").Show()
 		}
+		fmt.Println(mig)
 
 		file, _ := os.Create(fmt.Sprintf("%s.%s", name, outputFormat))
 		defer file.Close()
