@@ -68,7 +68,7 @@ func Prepare() *cobra.Command {
 	rootCmd.AddCommand(completeCmd)
 	rootCmd.AddCommand(rollbackCmd)
 	rootCmd.AddCommand(analyzeCmd)
-	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(migrateCmd())
 	rootCmd.AddCommand(pullCmd())

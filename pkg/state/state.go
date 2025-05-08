@@ -100,6 +100,11 @@ func (s *State) IsInitialized(ctx context.Context) (bool, error) {
 	return isInitialized, nil
 }
 
+func (s *State) Clean(ctx context.Context) error {
+	_, err := s.pgConn.ExecContext(ctx, fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", s.schema))
+	return err
+}
+
 func (s *State) Close() error {
 	return s.pgConn.Close()
 }
