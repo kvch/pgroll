@@ -44,10 +44,11 @@ type Roll struct {
 	// disable creation of version schema for raw SQL migrations
 	noVersionSchemaForRawSQL bool
 
-	migrationHooks MigrationHooks
-	state          *state.State
-	pgVersion      PGVersion
-	skipValidation bool
+	resourceCleaner *migrations.ResourceCleaner
+	migrationHooks  MigrationHooks
+	state           *state.State
+	pgVersion       PGVersion
+	skipValidation  bool
 }
 
 // New creates a new Roll instance

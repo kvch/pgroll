@@ -249,6 +249,12 @@ func (m *Roll) Complete(ctx context.Context) error {
 		return fmt.Errorf("unable to complete migration: %w", err)
 	}
 
+	// cleanup after the migration is complete
+	err = m.resourceCleaner.Cleanup(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to cleanup after migration: %w", err)
+	}
+
 	m.logger.LogMigrationComplete(migration)
 
 	return nil

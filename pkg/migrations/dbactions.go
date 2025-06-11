@@ -10,12 +10,39 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/xataio/pgroll/pkg/db"
+	"github.com/xataio/pgroll/pkg/migrations"
 )
 
 // DBAction is an interface for common database actions
 // pgroll runs during migrations.
 type DBAction interface {
 	Execute(context.Context) error
+}
+
+type ResourceCleaner struct {
+	cleanupOrder []string
+	cleanupFunc  map[string]migrations.DBAction
+}
+
+func (c *ResourceCleaner) AddCleanupAction(resourceID string, action migrations.DBAction) {
+	if _, exists := c.cleanupFunc[resourceID]; exists {
+		return
+	}
+	c.cleanupOrder = append(c.cleanupOrder, resourceID)
+	c.cleanupFunc[resourceID] = action
+}
+
+func (c *ResourceCleaner) Cleanup(ctx context.Context) error {
+	for _, resourceID := range c.cleanupOrder {
+		action, exists := c.cleanupFunc[resourceID]
+		if !exists {
+			continue
+		}
+		if err := action.Execute(ctx); err != nil {
+			return fmt.Errorf("failed to cleanup resource %s: %w", resourceID, err)
+		}
+	}
+	return nil
 }
 
 // dropColumnAction is a DBAction that drops one or more columns from a table.
