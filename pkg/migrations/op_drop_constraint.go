@@ -88,20 +88,12 @@ func (o *OpDropConstraint) Complete(ctx context.Context, l Logger, conn db.DB, s
 
 	cleaner.AddCleanupAction(TriggerFunctionName(o.Table, column.Name), NewDropFunctionAction(conn, TriggerFunctionName(o.Table, column.Name)))
 	cleaner.AddCleanupAction(TriggerFunctionName(o.Table, TemporaryName(column.Name)), NewDropFunctionAction(conn, TriggerFunctionName(o.Table, TemporaryName(column.Name))))
-
-	if err := NewAlterSequenceOwnerAction(conn, o.Table, column.Name, TemporaryName(column.Name)).Execute(ctx); err != nil {
-		return err
-	}
-
+	cleaner.AddCleanupAction(fmt.Sprintf("alter_seq_owner_%s", column.Name), NewAlterSequenceOwnerAction(conn, o.Table, column.Name, TemporaryName(column.Name)))
 	cleaner.AddCleanupAction(fmt.Sprintf("%s_%s", o.Table, backfill.CNeedsBackfillColumn), NewDropColumnAction(conn, table.Name, backfill.CNeedsBackfillColumn))
 	cleaner.AddCleanupAction(fmt.Sprintf("%s_%s", o.Table, column.Name), NewDropColumnAction(conn, table.Name, column.Name))
+	cleaner.AddCleanupAction(fmt.Sprintf("rename_%s_%s", TemporaryName(column.Name), column.Name), NewRenameDuplicatedColumnAction(conn, table, column.Name))
 
-	// Rename the new column to the old column name
-	if err := NewRenameDuplicatedColumnAction(conn, table, column.Name).Execute(ctx); err != nil {
-		return err
-	}
-
-	return err
+	return nil
 }
 
 func (o *OpDropConstraint) Rollback(ctx context.Context, l Logger, conn db.DB, s *schema.Schema) error {

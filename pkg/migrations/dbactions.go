@@ -10,7 +10,6 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/xataio/pgroll/pkg/db"
-	"github.com/xataio/pgroll/pkg/migrations"
 )
 
 // DBAction is an interface for common database actions
@@ -21,10 +20,10 @@ type DBAction interface {
 
 type ResourceCleaner struct {
 	cleanupOrder []string
-	cleanupFunc  map[string]migrations.DBAction
+	cleanupFunc  map[string]DBAction
 }
 
-func (c *ResourceCleaner) AddCleanupAction(resourceID string, action migrations.DBAction) {
+func (c *ResourceCleaner) AddCleanupAction(resourceID string, action DBAction) {
 	if _, exists := c.cleanupFunc[resourceID]; exists {
 		return
 	}
