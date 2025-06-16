@@ -48,6 +48,10 @@ func NewCreateTriggerAction(conn db.DB, cfg triggerConfig) DBAction {
 	}
 }
 
+func (a *createTriggerAction) ID() string {
+	return fmt.Sprintf("create_trigger_%s_%s_%s", a.cfg.TableName, a.cfg.PhysicalColumn, a.cfg.Direction)
+}
+
 func (a *createTriggerAction) Execute(ctx context.Context) error {
 	// Parenthesize the up/down SQL if it's not parenthesized already
 	if len(a.cfg.SQL) > 0 && a.cfg.SQL[0] != '(' {
