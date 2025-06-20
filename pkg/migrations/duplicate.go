@@ -19,12 +19,14 @@ import (
 type Duplicator struct {
 	stmtBuilder       *duplicatorStmtBuilder
 	conn              db.DB
+	table             string
 	columns           map[string]*columnToDuplicate
 	withoutConstraint []string
 }
 
 type columnToDuplicate struct {
 	column         *schema.Column
+	exists         bool // exists indicates if the column was duplicated already by a previous operation
 	asName         string
 	withoutNotNull bool
 	withType       string
@@ -56,6 +58,7 @@ func NewColumnDuplicator(conn db.DB, table *schema.Table, columns ...*schema.Col
 			table: table,
 		},
 		conn:              conn,
+		table:             table.Name,
 		columns:           cols,
 		withoutConstraint: make([]string, 0),
 	}
@@ -93,10 +96,27 @@ func (d *Duplicator) Duplicate(ctx context.Context) error {
 		colNames = append(colNames, name)
 
 		// Duplicate the column with the new type
-		if sql := d.stmtBuilder.duplicateColumn(c.column, c.asName, c.withoutNotNull, c.withType); sql != "" {
+		if sql := d.stmtBuilder.duplicateColumn(c.column, c.asName, c.withType); sql != "" {
 			_, err := d.conn.ExecContext(ctx, sql)
 			if err != nil {
 				return err
+			}
+		}
+
+		colInfo, err := d.fetchTempColumnInfo(ctx, c.asName)
+		if err != nil {
+			return err
+		}
+
+		if !colInfo.notNull {
+			// Duplicate NOT NULL constraint on column
+			if sql := d.stmtBuilder.duplicateNotNull(c.column, c.asName, c.withoutNotNull); sql != "" {
+				_, err := d.conn.ExecContext(ctx, sql)
+				if err != nil {
+					return err
+				}
+				// do not duplicate the NOT NULL constraint later during check constraints duplication
+				d.WithoutConstraint(DuplicationName(NotNullConstraintName(c.column.Name)))
 			}
 		}
 
@@ -161,6 +181,35 @@ func (d *Duplicator) Duplicate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+type tempColumnInfo struct {
+	notNull bool
+}
+
+func (d *Duplicator) fetchTempColumnInfo(ctx context.Context, columnName string) (tempColumnInfo, error) {
+	notNullIsSet, err := checkConstraintExists(ctx, d.conn, DuplicationName(NotNullConstraintName(d.table)))
+	if err != nil {
+		return tempColumnInfo{}, err
+	}
+
+	return tempColumnInfo{
+		notNull: notNullIsSet,
+	}, nil
+}
+
+func checkConstraintExists(ctx context.Context, conn db.DB, constraintName string) (bool, error) {
+	rows, err := conn.QueryContext(ctx, "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = $1)", constraintName)
+	if err != nil || rows == nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var exists bool
+	if err := db.ScanFirstValue(rows, &exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (d *duplicatorStmtBuilder) duplicateCheckConstraints(withoutConstraint []string, colNames ...string) []string {
@@ -276,30 +325,44 @@ func (d *duplicatorStmtBuilder) allConstraintColumns(constraintColumns []string,
 func (d *duplicatorStmtBuilder) duplicateColumn(
 	column *schema.Column,
 	asName string,
-	withoutNotNull bool,
 	withType string,
 ) string {
 	const (
-		cAlterTableSQL         = `ALTER TABLE %s ADD COLUMN %s %s`
-		cAddCheckConstraintSQL = `ADD CONSTRAINT %s %s NOT VALID`
+		cAlterTableSQL = `ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s`
 	)
 
 	// Generate SQL to duplicate the column's name and type
-	sql := fmt.Sprintf(cAlterTableSQL,
+	return fmt.Sprintf(cAlterTableSQL,
 		pq.QuoteIdentifier(d.table.Name),
 		pq.QuoteIdentifier(asName),
 		withType)
+}
+
+func (d *duplicatorStmtBuilder) duplicateNotNull(
+	column *schema.Column,
+	asName string,
+	withoutNotNull bool,
+) string {
+	const (
+		cAddCheckConstraintSQL = `ALTER TABLE %s ADD CONSTRAINT %s %s NOT VALID`
+	)
 
 	// Generate SQL to add an unchecked NOT NULL constraint if the original column
 	// is NOT NULL. The constraint will be validated on migration completion.
 	if !column.Nullable && !withoutNotNull {
-		sql += fmt.Sprintf(", "+cAddCheckConstraintSQL,
+		d.table.CheckConstraints[DuplicationName(NotNullConstraintName(column.Name))] = &schema.CheckConstraint{
+			Name:    DuplicationName(NotNullConstraintName(column.Name)),
+			Columns: []string{asName},
+		}
+
+		return fmt.Sprintf(cAddCheckConstraintSQL,
+			pq.QuoteIdentifier(d.table.Name),
 			pq.QuoteIdentifier(DuplicationName(NotNullConstraintName(column.Name))),
 			fmt.Sprintf("CHECK (%s IS NOT NULL)", pq.QuoteIdentifier(asName)),
 		)
 	}
 
-	return sql
+	return ""
 }
 
 func (d *duplicatorStmtBuilder) duplicateDefault(column *schema.Column, asName string) string {
