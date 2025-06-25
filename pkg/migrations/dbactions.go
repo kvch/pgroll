@@ -15,6 +15,7 @@ import (
 // DBAction is an interface for common database actions
 // pgroll runs during migrations.
 type DBAction interface {
+	ID() string
 	Execute(context.Context) error
 }
 
@@ -31,6 +32,10 @@ func NewAddColumnAction(conn db.DB, table string, c Column, withPK bool) *addCol
 		table:  table,
 		column: c,
 	}
+}
+
+func (a *addColumnAction) ID() string {
+	return fmt.Sprintf("add_column_%s_%s", a.table, a.column.Name)
 }
 
 func (a *addColumnAction) Execute(ctx context.Context) error {
@@ -60,6 +65,10 @@ func NewDropColumnAction(conn db.DB, table string, columns ...string) *dropColum
 		table:   table,
 		columns: columns,
 	}
+}
+
+func (a *dropColumnAction) ID() string {
+	return fmt.Sprintf("drop_column_%s_%s", a.table, strings.Join(a.columns, "_"))
 }
 
 func (a *dropColumnAction) Execute(ctx context.Context) error {
@@ -93,6 +102,10 @@ func NewRenameTableAction(conn db.DB, from, to string) *renameTableAction {
 	}
 }
 
+func (a *renameTableAction) ID() string {
+	return fmt.Sprintf("rename_table_%s_to_%s", a.from, a.to)
+}
+
 func (a *renameTableAction) Execute(ctx context.Context) error {
 	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME TO %s",
 		pq.QuoteIdentifier(a.from),
@@ -116,6 +129,10 @@ func NewRenameColumnAction(conn db.DB, table, from, to string) *renameColumnActi
 		from:  from,
 		to:    to,
 	}
+}
+
+func (a *renameColumnAction) ID() string {
+	return fmt.Sprintf("rename_column_%s_%s_to_%s", a.table, a.from, a.to)
 }
 
 func (a *renameColumnAction) Execute(ctx context.Context) error {
