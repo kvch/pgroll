@@ -12,7 +12,7 @@ const SQL = `WITH batch AS
   {{ end -}}
   ORDER BY {{ commaSeparate (quoteIdentifiers .PrimaryKey) }}
   LIMIT {{ .BatchSize }}
-  FOR NO KEY UPDATE
+  FOR UPDATE
 ),
 update AS
 (

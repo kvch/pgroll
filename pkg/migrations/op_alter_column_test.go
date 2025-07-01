@@ -505,6 +505,72 @@ func TestAlterColumnMultipleSubOperations(t *testing.T) {
 				}, rows)
 			},
 		},
+		{
+			name: "can alter and backfill a unique column",
+			migrations: []migrations.Migration{
+				{
+					Name: "01_create_table",
+					Operations: migrations.Operations{
+						&migrations.OpCreateTable{
+							Name: "people",
+							Columns: []migrations.Column{
+								{
+									Name: "id",
+									Type: "serial",
+									Pk:   true,
+								},
+								{
+									Name:     "name",
+									Type:     "varchar(255)",
+									Unique:   true,
+									Nullable: true,
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "02_alter_column",
+					Operations: migrations.Operations{
+						&migrations.OpAlterColumn{
+							Table:    "people",
+							Column:   "name",
+							Up:       "'unique ' || name",
+							Down:     "name",
+							Nullable: ptr(false),
+						},
+					},
+				},
+			},
+			afterStart: func(t *testing.T, db *sql.DB, schema string) {
+				// Inserting a row with a unique name
+				MustInsert(t, db, schema, "01_create_table", "people", map[string]string{
+					"id":   "1",
+					"name": "alice",
+				})
+				// Inserting a row with a missing name to old schema
+				MustInsert(t, db, schema, "01_create_table", "people", map[string]string{
+					"id": "2",
+				})
+				// Inserting a row with a unique, not null name to new schema
+				MustInsert(t, db, schema, "02_alter_column", "people", map[string]string{
+					"id":   "3",
+					"name": "bob",
+				})
+
+				// The version of the `people` table in the new schema has the expected rows.
+				rows := MustSelect(t, db, schema, "02_alter_column", "people")
+				assert.Equal(t, []map[string]any{
+					{"id": 1, "name": "unique alice"},
+					{"id": 2, "name": "unique "},
+					{"id": 3, "name": "bob"},
+				}, rows)
+			},
+			afterRollback: func(t *testing.T, db *sql.DB, schema string) {
+			},
+			afterComplete: func(t *testing.T, db *sql.DB, schema string) {
+			},
+		},
 	})
 }
 

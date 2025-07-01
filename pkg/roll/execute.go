@@ -103,12 +103,12 @@ func (m *Roll) StartDDLOperations(ctx context.Context, migration *migrations.Mig
 	for _, op := range migration.Operations {
 		task, err := op.Start(ctx, m.logger, m.pgConn, versionSchemaName, newSchema)
 		if err != nil {
-			errRollback := m.Rollback(ctx)
-			if errRollback != nil {
-				return nil, errors.Join(
-					fmt.Errorf("unable to execute start operation of %q: %w", migration.Name, err),
-					fmt.Errorf("unable to roll back failed operation: %w", errRollback))
-			}
+			//errRollback := m.Rollback(ctx)
+			//if errRollback != nil {
+			//	return nil, errors.Join(
+			//		fmt.Errorf("unable to execute start operation of %q: %w", migration.Name, err),
+			//		fmt.Errorf("unable to roll back failed operation: %w", errRollback))
+			//}
 			return nil, fmt.Errorf("failed to start %q migration, changes rolled back: %w", migration.Name, err)
 		}
 		// refresh schema when the op is isolated and requires a refresh (for example raw sql)
@@ -370,7 +370,8 @@ func (m *Roll) performBackfills(ctx context.Context, job *backfill.Job, cfg *bac
 		m.logger.LogBackfillStart(table.Name)
 
 		if err := bf.Start(ctx, table); err != nil {
-			errRollback := m.Rollback(ctx)
+			//errRollback := m.Rollback(ctx)
+			var errRollback error
 
 			return errors.Join(
 				fmt.Errorf("unable to backfill table %q: %w", table.Name, err),

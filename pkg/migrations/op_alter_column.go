@@ -61,7 +61,12 @@ func (o *OpAlterColumn) Start(ctx context.Context, l Logger, conn db.DB, latestS
 	// physical column name. in the down trigger first.
 	oldPhysicalColumn := column.Name
 	table.AddColumn(o.Column, &schema.Column{
-		Name: TemporaryName(o.Column),
+		Name:     TemporaryName(o.Column),
+		Type:     column.Type,
+		Default:  column.Default,
+		Nullable: column.Nullable,
+		Comment:  column.Comment,
+		Unique:   column.Unique,
 	})
 
 	// Add a trigger to copy values from the new column to the old.
