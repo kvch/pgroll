@@ -7,6 +7,8 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	
+	"github.com/xataio/pgroll/cmd/flags"
 )
 
 var rollbackCmd = &cobra.Command{
@@ -20,14 +22,24 @@ var rollbackCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sp, _ := pterm.DefaultSpinner.WithText("Rolling back migration...").Start()
+		isDryRun := flags.DryRun()
+		spinnerText := "Rolling back migration..."
+		if isDryRun {
+			spinnerText = "[DRY RUN] Rolling back migration..."
+		}
+
+		sp, _ := pterm.DefaultSpinner.WithText(spinnerText).Start()
 		err = m.Rollback(cmd.Context())
 		if err != nil {
 			sp.Fail(fmt.Sprintf("Failed to roll back migration: %s", err))
 			return err
 		}
 
-		sp.Success("Migration rolled back. Changes made since the last version have been reverted")
+		msg := "Migration rolled back. Changes made since the last version have been reverted"
+		if isDryRun {
+			msg = "[DRY RUN] Migration would be rolled back (no changes made)"
+		}
+		sp.Success(msg)
 		return nil
 	},
 }

@@ -21,6 +21,9 @@ type options struct {
 	migrationHooks MigrationHooks
 
 	verbose bool
+	
+	// whether to perform a dry run without making any changes
+	dryRun bool
 }
 
 // MigrationHooks defines hooks that can be set to be called at various points
@@ -92,5 +95,13 @@ func WithLogging(enabled bool) Option {
 		if enabled {
 			o.verbose = enabled
 		}
+	}
+}
+
+// WithDryRun enables dry run mode for the Roll instance
+// In dry run mode, no changes are made to the database
+func WithDryRun(enabled bool) Option {
+	return func(o *options) {
+		o.dryRun = enabled
 	}
 }

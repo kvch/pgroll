@@ -45,6 +45,7 @@ type Roll struct {
 	state          *state.State
 	pgVersion      PGVersion
 	skipValidation bool
+	dryRun         bool
 }
 
 // New creates a new Roll instance
@@ -60,7 +61,7 @@ func New(ctx context.Context, pgURL, schema string, state *state.State, opts ...
 	}
 
 	logger := migrations.NewNoopLogger()
-	if rollOpts.verbose {
+	if rollOpts.verbose || rollOpts.dryRun {
 		logger = migrations.NewLogger()
 	}
 
@@ -70,8 +71,15 @@ func New(ctx context.Context, pgURL, schema string, state *state.State, opts ...
 		return nil, fmt.Errorf("unable to retrieve postgres version: %w", err)
 	}
 
+	var dbConn db.DB = &db.RDB{DB: conn}
+	if rollOpts.dryRun {
+		dbConn = db.NewDryRunDB(dbConn, func(stmt string, args []any) {
+			logger.LogDryRun(stmt, args)
+		})
+	}
+
 	return &Roll{
-		pgConn:                &db.RDB{DB: conn},
+		pgConn:                dbConn,
 		logger:                logger,
 		schema:                schema,
 		state:                 state,
@@ -79,6 +87,7 @@ func New(ctx context.Context, pgURL, schema string, state *state.State, opts ...
 		disableVersionSchemas: rollOpts.disableVersionSchemas,
 		migrationHooks:        rollOpts.migrationHooks,
 		skipValidation:        rollOpts.skipValidation,
+		dryRun:                rollOpts.dryRun,
 	}, nil
 }
 

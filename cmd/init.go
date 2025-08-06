@@ -7,6 +7,8 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	
+	"github.com/xataio/pgroll/cmd/flags"
 )
 
 var initCmd = &cobra.Command{
@@ -19,14 +21,24 @@ var initCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sp, _ := pterm.DefaultSpinner.WithText("Initializing pgroll...").Start()
+		isDryRun := flags.DryRun()
+		spinnerText := "Initializing pgroll..."
+		if isDryRun {
+			spinnerText = "[DRY RUN] Initializing pgroll..."
+		}
+
+		sp, _ := pterm.DefaultSpinner.WithText(spinnerText).Start()
 		err = m.Init(cmd.Context())
 		if err != nil {
 			sp.Fail(fmt.Sprintf("Failed to initialize pgroll: %s", err))
 			return err
 		}
 
-		sp.Success("Initialization complete")
+		msg := "Initialization complete"
+		if isDryRun {
+			msg = "[DRY RUN] Initialization would be performed (no changes made)"
+		}
+		sp.Success(msg)
 		return nil
 	},
 }

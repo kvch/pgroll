@@ -19,6 +19,7 @@ import (
 type DBAction interface {
 	ID() string
 	Execute(context.Context) error
+	Statement() (string, error)
 }
 
 type addColumnAction struct {
@@ -40,16 +41,24 @@ func NewAddColumnAction(conn db.DB, table string, c Column, withPK bool) *addCol
 
 func (a *addColumnAction) ID() string { return a.id }
 
-func (a *addColumnAction) Execute(ctx context.Context) error {
+func (a *addColumnAction) Statement() (string, error) {
 	colSQL, err := ColumnSQLWriter{WithPK: a.withPK}.Write(a.column)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s",
+		pq.QuoteIdentifier(a.table),
+		colSQL,
+	), nil
+}
+
+func (a *addColumnAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
 	if err != nil {
 		return err
 	}
 
-	_, err = a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s",
-		pq.QuoteIdentifier(a.table),
-		colSQL,
-	))
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -73,10 +82,18 @@ func NewDropColumnAction(conn db.DB, table string, columns ...string) *dropColum
 func (a *dropColumnAction) ID() string { return a.id }
 
 func (a *dropColumnAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s %s",
-		pq.QuoteIdentifier(a.table),
-		a.dropMultipleColumns()))
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
+}
+
+func (a *dropColumnAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s %s",
+		pq.QuoteIdentifier(a.table),
+		a.dropMultipleColumns()), nil
 }
 
 func (a *dropColumnAction) dropMultipleColumns() string {
@@ -106,10 +123,18 @@ func NewRenameTableAction(conn db.DB, from, to string) *renameTableAction {
 
 func (a *renameTableAction) ID() string { return a.id }
 
-func (a *renameTableAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME TO %s",
+func (a *renameTableAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME TO %s",
 		pq.QuoteIdentifier(a.from),
-		pq.QuoteIdentifier(a.to)))
+		pq.QuoteIdentifier(a.to)), nil
+}
+
+func (a *renameTableAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -134,11 +159,19 @@ func NewRenameColumnAction(conn db.DB, table, from, to string) *renameColumnActi
 
 func (a *renameColumnAction) ID() string { return a.id }
 
-func (a *renameColumnAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME COLUMN %s TO %s",
+func (a *renameColumnAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME COLUMN %s TO %s",
 		pq.QuoteIdentifier(a.table),
 		pq.QuoteIdentifier(a.from),
-		pq.QuoteIdentifier(a.to)))
+		pq.QuoteIdentifier(a.to)), nil
+}
+
+func (a *renameColumnAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -163,11 +196,19 @@ func NewRenameConstraintAction(conn db.DB, table, from, to string) *renameConstr
 
 func (a *renameConstraintAction) ID() string { return a.id }
 
-func (a *renameConstraintAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME CONSTRAINT %s TO %s",
+func (a *renameConstraintAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME CONSTRAINT %s TO %s",
 		pq.QuoteIdentifier(a.table),
 		pq.QuoteIdentifier(a.from),
-		pq.QuoteIdentifier(a.to)))
+		pq.QuoteIdentifier(a.to)), nil
+}
+
+func (a *renameConstraintAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -191,11 +232,19 @@ func NewAddConstraintUsingUniqueIndex(conn db.DB, table, constraint, indexName s
 
 func (a *addConstraintUsingUniqueIndexAction) ID() string { return a.id }
 
-func (a *addConstraintUsingUniqueIndexAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s ADD CONSTRAINT %s UNIQUE USING INDEX %s",
+func (a *addConstraintUsingUniqueIndexAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s ADD CONSTRAINT %s UNIQUE USING INDEX %s",
 		pq.QuoteIdentifier(a.table),
 		pq.QuoteIdentifier(a.constraint),
-		pq.QuoteIdentifier(a.indexName)))
+		pq.QuoteIdentifier(a.indexName)), nil
+}
+
+func (a *addConstraintUsingUniqueIndexAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -217,11 +266,18 @@ func NewAddPrimaryKeyAction(conn db.DB, table, indexName string) *addPrimaryKeyA
 
 func (a *addPrimaryKeyAction) ID() string { return a.id }
 
-func (a *addPrimaryKeyAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD PRIMARY KEY USING INDEX %s",
+func (a *addPrimaryKeyAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE %s ADD PRIMARY KEY USING INDEX %s",
 		pq.QuoteIdentifier(a.table),
-		pq.QuoteIdentifier(a.indexName),
-	))
+		pq.QuoteIdentifier(a.indexName)), nil
+}
+
+func (a *addPrimaryKeyAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -242,13 +298,21 @@ func NewDropFunctionAction(conn db.DB, functions ...string) *dropFunctionAction 
 
 func (a *dropFunctionAction) ID() string { return a.id }
 
-func (a *dropFunctionAction) Execute(ctx context.Context) error {
+func (a *dropFunctionAction) Statement() (string, error) {
 	functions := make([]string, len(a.functions))
 	for idx, fn := range a.functions {
 		functions[idx] = pq.QuoteIdentifier(fn)
 	}
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
-		strings.Join(functions, ",")))
+	return fmt.Sprintf("DROP FUNCTION IF EXISTS %s CASCADE",
+		strings.Join(functions, ",")), nil
+}
+
+func (a *dropFunctionAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -280,7 +344,7 @@ func NewCreateIndexConcurrentlyAction(conn db.DB, table, name, method string, un
 
 func (a *createIndexConcurrentlyAction) ID() string { return a.id }
 
-func (a *createIndexConcurrentlyAction) Execute(ctx context.Context) error {
+func (a *createIndexConcurrentlyAction) Statement() (string, error) {
 	stmtFmt := "CREATE INDEX CONCURRENTLY %s ON %s"
 	if a.unique {
 		stmtFmt = "CREATE UNIQUE INDEX CONCURRENTLY %s ON %s"
@@ -326,7 +390,15 @@ func (a *createIndexConcurrentlyAction) Execute(ctx context.Context) error {
 	if a.predicate != "" {
 		stmt += fmt.Sprintf(" WHERE %s", a.predicate)
 	}
-	_, err := a.conn.ExecContext(ctx, stmt)
+	return stmt, nil
+}
+
+func (a *createIndexConcurrentlyAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -351,13 +423,19 @@ func NewCommentColumnAction(conn db.DB, table, column string, comment *string) *
 
 func (a *commentColumnAction) ID() string { return a.id }
 
-func (a *commentColumnAction) Execute(ctx context.Context) error {
-	commentSQL := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS %s",
+func (a *commentColumnAction) Statement() (string, error) {
+	return fmt.Sprintf("COMMENT ON COLUMN %s.%s IS %s",
 		pq.QuoteIdentifier(a.table),
 		pq.QuoteIdentifier(a.column),
-		commentToSQL(a.comment))
+		commentToSQL(a.comment)), nil
+}
 
-	_, err := a.conn.ExecContext(ctx, commentSQL)
+func (a *commentColumnAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -380,12 +458,18 @@ func NewCommentTableAction(conn db.DB, table string, comment *string) *commentTa
 
 func (a *commentTableAction) ID() string { return a.id }
 
-func (a *commentTableAction) Execute(ctx context.Context) error {
-	commentSQL := fmt.Sprintf("COMMENT ON TABLE %s IS %s",
+func (a *commentTableAction) Statement() (string, error) {
+	return fmt.Sprintf("COMMENT ON TABLE %s IS %s",
 		pq.QuoteIdentifier(a.table),
-		commentToSQL(a.comment))
+		commentToSQL(a.comment)), nil
+}
 
-	_, err := a.conn.ExecContext(ctx, commentSQL)
+func (a *commentTableAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -417,6 +501,10 @@ func NewCreateUniqueIndexConcurrentlyAction(conn db.DB, schemaName, indexName, t
 }
 
 func (a *createUniqueIndexConcurrentlyAction) ID() string { return a.id }
+
+func (a *createUniqueIndexConcurrentlyAction) Statement() (string, error) {
+	return a.getCreateUniqueIndexConcurrentlySQL(), nil
+}
 
 func (a *createUniqueIndexConcurrentlyAction) Execute(ctx context.Context) error {
 	quotedQualifiedIndexName := pq.QuoteIdentifier(a.indexName)
@@ -550,11 +638,19 @@ func NewCreateTableAction(conn db.DB, table, columns, constraints string) *creat
 
 func (a *createTableAction) ID() string { return a.id }
 
-func (a *createTableAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (%s %s)",
+func (a *createTableAction) Statement() (string, error) {
+	return fmt.Sprintf("CREATE TABLE %s (%s %s)",
 		pq.QuoteIdentifier(a.table),
 		a.columns,
-		a.constraints))
+		a.constraints), nil
+}
+
+func (a *createTableAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -575,9 +671,17 @@ func NewDropIndexAction(conn db.DB, name string) *dropIndexAction {
 
 func (a *dropIndexAction) ID() string { return a.id }
 
+func (a *dropIndexAction) Statement() (string, error) {
+	return fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s",
+		pq.QuoteIdentifier(a.name)), nil
+}
+
 func (a *dropIndexAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s",
-		pq.QuoteIdentifier(a.name)))
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -598,9 +702,17 @@ func NewDropTableAction(conn db.DB, table string) *DropTableAction {
 
 func (a *DropTableAction) ID() string { return a.id }
 
+func (a *DropTableAction) Statement() (string, error) {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s",
+		pq.QuoteIdentifier(a.table)), nil
+}
+
 func (a *DropTableAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s",
-		pq.QuoteIdentifier(a.table)))
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -623,10 +735,18 @@ func NewValidateConstraintAction(conn db.DB, table, constraint string) *validate
 
 func (a *validateConstraintAction) ID() string { return a.id }
 
-func (a *validateConstraintAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s VALIDATE CONSTRAINT %s",
+func (a *validateConstraintAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s VALIDATE CONSTRAINT %s",
 		pq.QuoteIdentifier(a.table),
-		pq.QuoteIdentifier(a.constraint)))
+		pq.QuoteIdentifier(a.constraint)), nil
+}
+
+func (a *validateConstraintAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -657,7 +777,7 @@ func NewCreateCheckConstraintAction(conn db.DB, table, constraint, check string,
 
 func (a *CreateCheckConstraintAction) ID() string { return a.id }
 
-func (a *CreateCheckConstraintAction) Execute(ctx context.Context) error {
+func (a *CreateCheckConstraintAction) Statement() (string, error) {
 	sql := fmt.Sprintf("ALTER TABLE %s ADD ", pq.QuoteIdentifier(a.table))
 
 	writer := &ConstraintSQLWriter{
@@ -665,7 +785,15 @@ func (a *CreateCheckConstraintAction) Execute(ctx context.Context) error {
 		SkipValidation: a.skipValidation,
 	}
 	sql += writer.WriteCheck(rewriteCheckExpression(a.check, a.columns...), a.noInherit)
-	_, err := a.conn.ExecContext(ctx, sql)
+	return sql, nil
+}
+
+func (a *CreateCheckConstraintAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -710,7 +838,7 @@ func NewCreateFKConstraintAction(conn db.DB, table, constraint string, columns [
 
 func (a *createFKConstraintAction) ID() string { return a.id }
 
-func (a *createFKConstraintAction) Execute(ctx context.Context) error {
+func (a *createFKConstraintAction) Statement() (string, error) {
 	sql := fmt.Sprintf("ALTER TABLE %s ADD ", pq.QuoteIdentifier(a.table))
 	writer := &ConstraintSQLWriter{
 		Name:              a.constraint,
@@ -726,8 +854,15 @@ func (a *createFKConstraintAction) Execute(ctx context.Context) error {
 		a.reference.OnUpdate,
 		a.reference.OnDeleteSetColumns,
 		a.reference.MatchType)
+	return sql, nil
+}
 
-	_, err := a.conn.ExecContext(ctx, sql)
+func (a *createFKConstraintAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -750,6 +885,17 @@ func NewAlterSequenceOwnerAction(conn db.DB, table, from, to string) *alterSeque
 }
 
 func (a *alterSequenceOwnerAction) ID() string { return a.id }
+
+func (a *alterSequenceOwnerAction) Statement() (string, error) {
+	// Note: This method cannot determine the sequence name without a context,
+	// so it returns a placeholder statement. The actual sequence name is
+	// determined at execution time.
+	return fmt.Sprintf("ALTER SEQUENCE IF EXISTS <sequence_for_%s.%s> OWNED BY %s.%s",
+		a.table,
+		a.from,
+		pq.QuoteIdentifier(a.table),
+		pq.QuoteIdentifier(a.to)), nil
+}
 
 func (a *alterSequenceOwnerAction) Execute(ctx context.Context) error {
 	sequence := getSequenceNameForColumn(ctx, a.conn, a.table, a.from)
@@ -801,10 +947,18 @@ func NewDropConstraintAction(conn db.DB, table, constraint string) *dropConstrai
 
 func (a *dropConstraintAction) ID() string { return a.id }
 
-func (a *dropConstraintAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP CONSTRAINT IF EXISTS %s",
+func (a *dropConstraintAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s DROP CONSTRAINT IF EXISTS %s",
 		pq.QuoteIdentifier(a.table),
-		pq.QuoteIdentifier(a.constraint)))
+		pq.QuoteIdentifier(a.constraint)), nil
+}
+
+func (a *dropConstraintAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -826,10 +980,18 @@ func NewSetNotNullAction(conn db.DB, table, column string) *setNotNullAction {
 
 func (a *setNotNullAction) ID() string { return a.id }
 
-func (a *setNotNullAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s SET NOT NULL",
+func (a *setNotNullAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s SET NOT NULL",
 		pq.QuoteIdentifier(a.table),
-		pq.QuoteIdentifier(a.column)))
+		pq.QuoteIdentifier(a.column)), nil
+}
+
+func (a *setNotNullAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -853,11 +1015,19 @@ func NewSetDefaultValueAction(conn db.DB, table, column, defaultValue string) *s
 
 func (a *setDefaultAction) ID() string { return a.id }
 
-func (a *setDefaultAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s SET DEFAULT %s",
+func (a *setDefaultAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s SET DEFAULT %s",
 		pq.QuoteIdentifier(a.table),
 		pq.QuoteIdentifier(a.column),
-		a.defaultValue))
+		a.defaultValue), nil
+}
+
+func (a *setDefaultAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -879,10 +1049,18 @@ func NewDropDefaultValueAction(conn db.DB, table, column string) *dropDefaultAct
 
 func (a *dropDefaultAction) ID() string { return a.id }
 
-func (a *dropDefaultAction) Execute(ctx context.Context) error {
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s DROP DEFAULT",
+func (a *dropDefaultAction) Statement() (string, error) {
+	return fmt.Sprintf("ALTER TABLE IF EXISTS %s ALTER COLUMN %s DROP DEFAULT",
 		pq.QuoteIdentifier(a.table),
-		pq.QuoteIdentifier(a.column)))
+		pq.QuoteIdentifier(a.column)), nil
+}
+
+func (a *dropDefaultAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }
 
@@ -901,6 +1079,10 @@ func NewRawSQLAction(conn db.DB, sql string) *rawSQLAction {
 }
 
 func (a *rawSQLAction) ID() string { return a.id }
+
+func (a *rawSQLAction) Statement() (string, error) {
+	return a.sql, nil
+}
 
 func (a *rawSQLAction) Execute(ctx context.Context) error {
 	_, err := a.conn.ExecContext(ctx, a.sql)
@@ -928,16 +1110,23 @@ func NewSetReplicaIdentityAction(conn db.DB, table string, identityType, index s
 
 func (a *setReplicaIdentityAction) ID() string { return a.id }
 
-func (a *setReplicaIdentityAction) Execute(ctx context.Context) error {
+func (a *setReplicaIdentityAction) Statement() (string, error) {
 	// build the correct form of the `SET REPLICA IDENTITY` statement based on the`identity type
 	identitySQL := a.identity
 	if identitySQL == "INDEX" {
 		identitySQL = fmt.Sprintf("USING INDEX %s", pq.QuoteIdentifier(a.index))
 	}
 
-	// set the replica identity on the underlying table
-	_, err := a.conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY %s",
+	return fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY %s",
 		pq.QuoteIdentifier(a.table),
-		identitySQL))
+		identitySQL), nil
+}
+
+func (a *setReplicaIdentityAction) Execute(ctx context.Context) error {
+	stmt, err := a.Statement()
+	if err != nil {
+		return err
+	}
+	_, err = a.conn.ExecContext(ctx, stmt)
 	return err
 }

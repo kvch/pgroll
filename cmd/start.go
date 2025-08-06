@@ -80,7 +80,13 @@ func runMigrationFromFile(ctx context.Context, m *roll.Roll, fileName string, co
 }
 
 func runMigration(ctx context.Context, m *roll.Roll, migration *migrations.Migration, complete bool, c *backfill.Config) error {
-	sp, _ := pterm.DefaultSpinner.WithText("Starting migration...").Start()
+	isDryRun := flags.DryRun()
+	spinnerText := "Starting migration..."
+	if isDryRun {
+		spinnerText = "[DRY RUN] Starting migration..."
+	}
+	
+	sp, _ := pterm.DefaultSpinner.WithText(spinnerText).Start()
 	c.AddCallback(func(n int64, total int64) {
 		if total > 0 {
 			percent := float64(n) / float64(total) * 100
@@ -106,7 +112,12 @@ func runMigration(ctx context.Context, m *roll.Roll, migration *migrations.Migra
 	}
 
 	var msg string
-	if m.UseVersionSchema() {
+	if isDryRun {
+		msg = fmt.Sprintf("[DRY RUN] Migration %q would be started (no changes made)", migration.Name)
+		if complete {
+			msg = fmt.Sprintf("[DRY RUN] Migration %q would be started and completed (no changes made)", migration.Name)
+		}
+	} else if m.UseVersionSchema() {
 		viewName := roll.VersionedSchemaName(flags.Schema(), migration.VersionSchemaName())
 		msg = fmt.Sprintf("New version of the schema available under the postgres %q schema", viewName)
 	} else {

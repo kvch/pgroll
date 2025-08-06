@@ -24,9 +24,12 @@ func NewRoll(ctx context.Context) (*roll.Roll, error) {
 	role := flags.Role()
 	skipValidation := flags.SkipValidation()
 	verbose := flags.Verbose()
+	dryRun := flags.DryRun()
 	useVersionSchema := flags.UseVersionSchema()
 
-	state, err := state.New(ctx, pgURL, stateSchema, state.WithPgrollVersion(Version))
+	state, err := state.New(ctx, pgURL, stateSchema, 
+		state.WithPgrollVersion(Version),
+		state.WithDryRun(dryRun))
 	if err != nil {
 		return nil, err
 	}
@@ -36,6 +39,7 @@ func NewRoll(ctx context.Context) (*roll.Roll, error) {
 		roll.WithRole(role),
 		roll.WithSkipValidation(skipValidation),
 		roll.WithLogging(verbose),
+		roll.WithDryRun(dryRun),
 		roll.WithVersionSchema(useVersionSchema),
 	)
 }
@@ -89,6 +93,7 @@ func Prepare() *cobra.Command {
 	rootCmd.PersistentFlags().String("role", "", "Optional postgres role to set when executing migrations")
 	rootCmd.PersistentFlags().Bool("use-version-schema", true, "Create version schemas for each migration")
 	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose logging")
+	rootCmd.PersistentFlags().Bool("dry-run", false, "Perform a dry run without making any changes")
 
 	viper.BindPFlag("PG_URL", rootCmd.PersistentFlags().Lookup("postgres-url"))
 	viper.BindPFlag("SCHEMA", rootCmd.PersistentFlags().Lookup("schema"))
@@ -97,6 +102,7 @@ func Prepare() *cobra.Command {
 	viper.BindPFlag("ROLE", rootCmd.PersistentFlags().Lookup("role"))
 	viper.BindPFlag("USE_VERSION_SCHEMA", rootCmd.PersistentFlags().Lookup("use-version-schema"))
 	viper.BindPFlag("VERBOSE", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("DRY_RUN", rootCmd.PersistentFlags().Lookup("dry-run"))
 
 	// register subcommands
 	rootCmd.AddCommand(startCmd())

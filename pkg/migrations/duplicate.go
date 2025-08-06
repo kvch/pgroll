@@ -67,6 +67,19 @@ func NewColumnDuplicator(conn db.DB, table *schema.Table, columns ...*schema.Col
 
 func (d *duplicator) ID() string { return d.id }
 
+// Statement returns a descriptive statement for the duplicator action.
+// Since duplicator performs multiple SQL operations, this returns a
+// high-level description rather than executable SQL.
+func (d *duplicator) Statement() (string, error) {
+	columnNames := make([]string, 0, len(d.columns))
+	for name := range d.columns {
+		columnNames = append(columnNames, name)
+	}
+	return fmt.Sprintf("-- Duplicate columns %s in table %s with all constraints and comments",
+		strings.Join(columnNames, ", "),
+		d.stmtBuilder.table.Name), nil
+}
+
 // WithType sets the type of the new column.
 func (d *duplicator) WithType(columnName, t string) *duplicator {
 	d.columns[columnName].withType = t

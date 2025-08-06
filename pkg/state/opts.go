@@ -11,3 +11,10 @@ func WithPgrollVersion(version string) StateOpt {
 		s.pgrollVersion = version
 	}
 }
+
+// WithDryRun enables dry run mode for the State instance
+func WithDryRun(enabled bool) StateOpt {
+	return func(s *State) {
+		s.dryRun = enabled
+	}
+}

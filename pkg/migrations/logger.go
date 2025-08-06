@@ -19,6 +19,7 @@ type Logger interface {
 	LogBackfillComplete(table string)
 	LogSchemaCreation(migration, schema string)
 	LogSchemaDeletion(migration, schema string)
+	LogDryRun(stmt string, args []any)
 
 	Info(msg string, args ...any)
 }
@@ -259,6 +260,13 @@ func (l migrationLogger) extractOpArgs(op Operation) []any {
 	}
 }
 
+func (l *migrationLogger) LogDryRun(stmt string, args []any) {
+	l.logger.Info("dry run", l.logger.Args(
+		"statement", stmt,
+		"args", args,
+	))
+}
+
 func getColumnNames(cols []Column) []string {
 	columns := make([]string, len(cols))
 	for i, c := range cols {
@@ -287,3 +295,4 @@ func (l *noopLogger) LogOperationStart(op Operation)             {}
 func (l *noopLogger) LogOperationComplete(op Operation)          {}
 func (l *noopLogger) LogOperationRollback(op Operation)          {}
 func (l *noopLogger) Info(msg string, args ...any)               {}
+func (l *noopLogger) LogDryRun(stmt string, args []any)          {}

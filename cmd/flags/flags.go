@@ -30,6 +30,8 @@ func Role() string {
 
 func Verbose() bool { return viper.GetBool("VERBOSE") }
 
+func DryRun() bool { return viper.GetBool("DRY_RUN") }
+
 func UseVersionSchema() bool {
 	return viper.GetBool("USE_VERSION_SCHEMA")
 }

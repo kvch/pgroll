@@ -7,6 +7,8 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	
+	"github.com/xataio/pgroll/cmd/flags"
 )
 
 var completeCmd = &cobra.Command{
@@ -20,14 +22,24 @@ var completeCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sp, _ := pterm.DefaultSpinner.WithText("Completing migration...").Start()
+		isDryRun := flags.DryRun()
+		spinnerText := "Completing migration..."
+		if isDryRun {
+			spinnerText = "[DRY RUN] Completing migration..."
+		}
+
+		sp, _ := pterm.DefaultSpinner.WithText(spinnerText).Start()
 		err = m.Complete(cmd.Context())
 		if err != nil {
 			sp.Fail(fmt.Sprintf("Failed to complete migration: %s", err))
 			return err
 		}
 
-		sp.Success("Migration successful!")
+		msg := "Migration successful!"
+		if isDryRun {
+			msg = "[DRY RUN] Migration would be completed (no changes made)"
+		}
+		sp.Success(msg)
 		return nil
 	},
 }

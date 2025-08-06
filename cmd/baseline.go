@@ -10,6 +10,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/xataio/pgroll/cmd/flags"
 	"github.com/xataio/pgroll/pkg/migrations"
 )
 
@@ -40,8 +41,10 @@ func baselineCmd() *cobra.Command {
 				return err
 			}
 
-			// Prompt for confirmation unless --yes flag is set
-			if !yes {
+			isDryRun := flags.DryRun()
+			
+			// Prompt for confirmation unless --yes flag is set or in dry-run mode
+			if !yes && !isDryRun {
 				fmt.Println("Creating a baseline migration will restart the migration history.")
 				ok, _ := pterm.DefaultInteractiveConfirm.Show()
 				if !ok {
@@ -60,23 +63,36 @@ func baselineCmd() *cobra.Command {
 				Operations: opsJSON,
 			}
 
-			// Write the placeholder migration to disk
-			filePath, err := writeMigrationToFile(mig, targetDir, "", useJSON)
-			if err != nil {
-				return fmt.Errorf("failed to write placeholder baseline migration: %w", err)
+			// Write the placeholder migration to disk (unless dry-run)
+			var filePath string
+			if !isDryRun {
+				filePath, err = writeMigrationToFile(mig, targetDir, "", useJSON)
+				if err != nil {
+					return fmt.Errorf("failed to write placeholder baseline migration: %w", err)
+				}
 			}
 
-			sp, _ := pterm.DefaultSpinner.WithText(fmt.Sprintf("Creating baseline migration %q...", version)).Start()
+			spinnerText := fmt.Sprintf("Creating baseline migration %q...", version)
+			if isDryRun {
+				spinnerText = fmt.Sprintf("[DRY RUN] Creating baseline migration %q...", version)
+			}
+			sp, _ := pterm.DefaultSpinner.WithText(spinnerText).Start()
 
 			// Create the baseline in the target database
 			err = m.CreateBaseline(ctx, version)
 			if err != nil {
 				sp.Fail(fmt.Sprintf("Failed to create baseline: %s", err))
-				err = errors.Join(err, os.Remove(filePath))
+				if !isDryRun && filePath != "" {
+					err = errors.Join(err, os.Remove(filePath))
+				}
 				return err
 			}
 
-			sp.Success(fmt.Sprintf("Baseline created successfully. Placeholder migration %q written", filePath))
+			msg := fmt.Sprintf("Baseline created successfully. Placeholder migration %q written", filePath)
+			if isDryRun {
+				msg = fmt.Sprintf("[DRY RUN] Baseline would be created for version %q (no changes made)", version)
+			}
+			sp.Success(msg)
 			return nil
 		},
 	}

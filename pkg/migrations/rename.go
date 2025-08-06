@@ -37,6 +37,16 @@ func NewRenameDuplicatedColumnAction(conn db.DB, table *schema.Table, column str
 
 func (a *renameDuplicatedColumnAction) ID() string { return a.id }
 
+// Statement returns a descriptive statement for the rename duplicated column action.
+// Since this action performs multiple SQL operations, this returns a
+// high-level description rather than executable SQL.
+func (a *renameDuplicatedColumnAction) Statement() (string, error) {
+	return fmt.Sprintf("-- Rename duplicated column %s to %s in table %s and rename all associated constraints and indexes",
+		a.from,
+		a.to,
+		a.table.Name), nil
+}
+
 func (a *renameDuplicatedColumnAction) Execute(ctx context.Context) error {
 	const (
 		cRenameIndexSQL = `ALTER INDEX IF EXISTS %s RENAME TO %s`

@@ -28,6 +28,7 @@ type State struct {
 	pgConn        *sql.DB
 	pgrollVersion string
 	schema        string
+	dryRun        bool
 }
 
 func New(ctx context.Context, pgURL, stateSchema string, opts ...StateOpt) (*State, error) {
